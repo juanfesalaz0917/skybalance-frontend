@@ -1,0 +1,179 @@
+/* ── Tailwind v4: single import replaces the three @tailwind directives ── */
+@import "tailwindcss";
+
+
+/* ── 2. Theme tokens — @theme replaces tailwind.config.js in v4 ──────────────
+   These auto-generate Tailwind classes:
+     bg-brand-black, text-accent-promo, shadow-card, etc.
+   --------------------------------------------------------------------------- */
+@theme {
+  --color-brand-black:       #0a0a0a;
+  --color-brand-white:       #ffffff;
+  --color-brand-light:       #f0f0f0;
+  --color-brand-mid:         #d8d8d8;
+  --color-brand-border:      #e2e2e2;
+
+  --color-accent-promo:      #f59e0b;
+  --color-accent-promo-txt:  #92400e;
+  --color-accent-alert:      #ef4444;
+  --color-accent-alert-txt:  #7f1d1d;
+
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --font-body:    'DM Sans', 'Helvetica Neue', sans-serif;
+
+  --radius-card:  1rem;
+  --radius-modal: 1.25rem;
+  --radius-pill:  9999px;
+
+  --shadow-card:  0 2px 8px 0 rgba(0,0,0,0.08);
+  --shadow-modal: 0 20px 60px 0 rgba(0,0,0,0.35);
+
+  --logo-size: 48px;   /* ← change this to resize the logo mark */
+  --logo-gap:  8px;
+}
+
+
+/* ── 3. CSS Custom Properties (Design Tokens) ─────────────────────────────────
+   All brand colours live here. Change a value once → it updates everywhere.
+   These are also mapped in tailwind.config.js so you can use them as
+   Tailwind classes: bg-brand-black, text-brand-accent, etc.
+   --------------------------------------------------------------------------- */
+:root {
+  /* ── Core palette ── */
+  --color-brand-black:       #0a0a0a;   /* Main dark background (navbar, card, footer) */
+  --color-brand-white:       #ffffff;   /* Card backgrounds, input fills                */
+  --color-brand-gray-light:  #f0f0f0;   /* Page background gradient start               */
+  --color-brand-gray-mid:    #d8d8d8;   /* Page background gradient end                 */
+  --color-brand-gray-border: #e2e2e2;   /* Card borders, dividers                       */
+
+  /* ── Accent colours ── */
+  --color-accent-promo:      #f59e0b;   /* Amber — promotion badge background           */
+  --color-accent-promo-text: #92400e;   /* Amber dark — promotion badge text            */
+  --color-accent-alert:      #ef4444;   /* Red — alert badge background                 */
+  --color-accent-alert-text: #7f1d1d;   /* Red dark — alert badge text                  */
+
+  /* ── Typography ── */
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;  /* Headings / logo wordmark */
+  --font-body:    'DM Sans', 'Helvetica Neue', sans-serif;   /* All body text             */
+
+  /* ── Spacing scale (used in logo area) ── */
+  --logo-size:    48px;   /* Width & height of the logo mark SVG   */
+  --logo-gap:     8px;    /* Gap between logo mark and wordmark    */
+}
+
+
+/* ── 3. Base layer resets ─────────────────────────────────────────────────────
+   @layer base keeps these inside Tailwind's specificity system so they
+   don't accidentally override your utility classes.
+   --------------------------------------------------------------------------- */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    /* Smooth scrolling for anchor links */
+    scroll-behavior: smooth;
+    /* Prevent font-size inflation on mobile */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-brand-gray-light);
+    color: var(--color-brand-black);
+    /* Improve text rendering on all platforms */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Remove default list styles (Tailwind Preflight does this, but explicit is clear) */
+  ul, ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Remove default button styles so components start from zero */
+  button {
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+  }
+
+  /* Consistent focus outline for keyboard navigation */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-black);
+    outline-offset: 2px;
+  }
+}
+
+
+/* ── 4. Logo placeholder ──────────────────────────────────────────────────────
+   The .skybalance-logo class is applied to the wrapper element that holds
+   your brand mark (SVG inline, <img>, or icon font glyph).
+
+   HOW TO SWAP THE LOGO
+   ────────────────────
+   Option A — Keep the inline SVG in Navbar.tsx / LoginPage.tsx.
+              Just edit the <svg> tag directly in those components.
+
+   Option B — Use an image file:
+              1. Drop your file into src/assets/logo.svg  (or .png)
+              2. In Navbar.tsx: import logo from '../assets/logo.svg';
+              3. Replace the <svg>…</svg> block with: <img src={logo} alt="SkyBalance" />
+              4. The .skybalance-logo styles below control its dimensions.
+
+   Option C — Use a font icon (e.g. Font Awesome plane):
+              <i className="skybalance-logo fa-solid fa-plane-circle-check" />
+   --------------------------------------------------------------------------- */
+.skybalance-logo {
+  width:  var(--logo-size);     /* ← change --logo-size in :root to resize */
+  height: var(--logo-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Wordmark (text next to the logo mark) */
+.skybalance-wordmark {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  line-height: 1;
+}
+
+
+/* ── 5. Utility overrides ─────────────────────────────────────────────────────
+   Small global tweaks that don't belong in a component but aren't pure resets.
+   --------------------------------------------------------------------------- */
+@layer utilities {
+  /* Hides the native number input arrows (used in FlightModal price fields) */
+  .no-arrows::-webkit-inner-spin-button,
+  .no-arrows::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .no-arrows {
+    -moz-appearance: textfield;
+  }
+
+  /* Full-screen centered flex helper */
+  .screen-center {
+    @apply min-h-screen flex items-center justify-center;
+  }
+
+  /* Aviation-grey page background (matches the mockup's desaturated photo feel) */
+  .bg-aviation {
+    background-image: linear-gradient(
+      160deg,
+      var(--color-brand-gray-light) 0%,
+      #f5f5f5                       50%,
+      var(--color-brand-gray-mid)   100%
+    );
+  }
+}
