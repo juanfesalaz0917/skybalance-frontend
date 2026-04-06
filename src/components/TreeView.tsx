@@ -29,18 +29,23 @@
  *   ■ Zinc border    → normal node
  */
 
-import React, {
-  useMemo, useState, useRef, useCallback, useEffect,
-} from 'react';
 import {
-  Loader2, ServerCrash, X, RefreshCw,
-  ZoomIn, ZoomOut, Maximize2,
-  ChevronRight, ChevronLeft,
+  ChevronLeft,
+  Loader2,
+  Maximize2,
+  RefreshCw,
+  ServerCrash, X,
+  ZoomIn, ZoomOut,
 } from 'lucide-react';
+import React, {
+  useCallback, useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
-import type { TreeNode }    from '../models/FlightNode';
-import type { TreeProperties } from '../models/FlightNode';
 import { useTreeData } from '../hooks/useTreeData';
+import type { TreeNode, TreeProperties } from '../models/FlightNode';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 

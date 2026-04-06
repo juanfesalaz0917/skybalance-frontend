@@ -20,32 +20,32 @@
  *  - (D) Hooks (useFlights, useAppState, useTreeData) are the only dependencies.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 import FlightModal from "./components/FlightModal";
-import TreeView from "./components/TreeView";
-import Navbar from "./components/Navbar";
 import JSONLoader from "./components/JSONLoader";
+import Navbar from "./components/Navbar";
 import StressModeBar from "./components/StressModeBar";
+import TreeView from "./components/TreeView";
 
-import VersioningPanel from "./components/VersioningPanel";
 import ConcurrencyQueue from "./components/ConcurrencyQueue";
+import VersioningPanel from "./components/VersioningPanel";
 
+import { useAppState } from "./hooks/useAppState";
 import { useAuth } from "./hooks/useAuth";
 import { useFlights } from "./hooks/useFlights";
-import { useAppState } from "./hooks/useAppState";
 import { useTreeData } from "./hooks/useTreeData";
 
-import { TreeService } from "./services/TreeService";
-import type { FlightData, TreeResponse } from "./models/FlightNode";
-import type {
-  RebalanceResult,
-  AVLVerifyResult,
-  MinProfitResult,
-} from "./services/TreeService";
 import AnalyticsPanel from "./components/AnaliticsPanel";
 import FlightsPage from "./components/Flightspage";
 import LoginPage from "./components/LoginPage";
+import type { FlightData } from "./models/FlightNode";
+import type {
+  AVLVerifyResult,
+  MinProfitResult,
+  RebalanceResult,
+} from "./services/TreeService";
+import { TreeService } from "./services/TreeService";
 
 // ─── Modal mode type ──────────────────────────────────────────────────────────
 
@@ -94,8 +94,6 @@ const App: React.FC = () => {
     versions,
     saveVersion,
     deleteVersion,
-    error: appError,
-    clearError,
   } = useAppState();
 
   // ── UI state ──────────────────────────────────────────────────────────────
@@ -299,7 +297,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRestoreVersion = async (version: { snapshot: TreeResponse }) => {
+  const handleRestoreVersion = async () => {
     try {
       // Same pattern as undo — in production add a POST /api/tree/restore endpoint.
       await TreeService.resetSystem();
