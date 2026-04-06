@@ -8,11 +8,11 @@
  *  - (I) Interface Segregation: Each response interface is scoped to its endpoint.
  *  - (D) Dependency Inversion: Hooks/components depend on this service's interfaces.
  *
- * All endpoints assumed in the Python backend (Flask Blueprint "tree" and "flights").
+ * Routes are mapped to the real Flask backend (skybalance_backend).
  */
 
 import axios from 'axios';
-import type { FlightData, TreeNode, TreeResponse } from '../models/FlightNode';
+import type { FlightData, TreeNode, TreeProperties, TreeResponse } from '../models/FlightNode';
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000/api';
 
@@ -21,6 +21,60 @@ const http = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 15_000,
 });
+
+// ─── Backend → Frontend normalisation helpers ─────────────────────────────────
+
+type RawNode = Record<string, unknown> | null;
+
+/**
+ * Converts a flat backend node (all flight fields + izquierdo/derecho at root level)
+ * into the frontend TreeNode shape { flight: FlightData, izquierdo, derecho }.
+ */
+function rawToTreeNode(raw: RawNode): TreeNode | null {
+  if (!raw) return null;
+  const { izquierdo, derecho, ...flightFields } = raw;
+  return {
+    flight:    flightFields as unknown as FlightData,
+    izquierdo: rawToTreeNode((izquierdo as RawNode) ?? null),
+    derecho:   rawToTreeNode((derecho   as RawNode) ?? null),
+  };
+}
+
+type RotacionesBackend = { LL?: number; RR?: number; LR?: number; RL?: number };
+type RotacionesFrontend = { II: number; DD: number; ID: number; DI: number };
+
+/** Maps backend rotation keys (LL/RR/LR/RL) to frontend keys (II/DD/ID/DI). */
+function toRotaciones(r: RotacionesBackend | RotacionesFrontend | undefined): RotacionesFrontend {
+  if (!r) return { II: 0, DD: 0, ID: 0, DI: 0 };
+  const b = r as RotacionesBackend & RotacionesFrontend;
+  return {
+    II: b.II ?? b.LL ?? 0,
+    DD: b.DD ?? b.RR ?? 0,
+    ID: b.ID ?? b.LR ?? 0,
+    DI: b.DI ?? b.RL ?? 0,
+  };
+}
+
+/**
+ * Converts backend avl summary to frontend TreeProperties.
+ * Backend uses: profundidad / totalNodos / rotaciones (or height/totalNodes/rotations).
+ */
+function rawToTreeProperties(p: Record<string, unknown>): TreeProperties {
+  return {
+    raiz:       (p.raiz as string | null) ?? null,
+    altura:     ((p.profundidad ?? p.height)    as number) ?? 0,
+    nodos:      ((p.totalNodos  ?? p.totalNodes) as number) ?? 0,
+    rotaciones: toRotaciones((p.rotaciones ?? p.rotations) as RotacionesBackend | undefined),
+  };
+}
+
+/** Builds a TreeResponse from a raw backend mutation response { tree, properties }. */
+function rawToTreeResponse(data: Record<string, unknown>): TreeResponse {
+  return {
+    tree:       rawToTreeNode((data.tree as RawNode) ?? null),
+    properties: rawToTreeProperties((data.properties as Record<string, unknown>) ?? {}),
+  };
+}
 
 // ─── Response shape interfaces ────────────────────────────────────────────────
 
@@ -115,14 +169,27 @@ export const TreeService = {
 
   /** REQ §1.2 — removes node AND all its descendants (subtree cancellation) */
   async cancelFlight(code: string): Promise<void> {
-    await http.delete(`/flights/${code}/cancel`);
+    await http.delete(`/trees/cancel/${code}`);
   },
 
   // ── TREE ───────────────────────────────────────────────────────────────────
 
   async getCurrentTree(): Promise<TreeResponse> {
-    const res = await http.get<TreeResponse>('/tree/current');
-    return res.data;
+    const [exportRes, metricsRes] = await Promise.all([
+      http.get<{ tree: RawNode }>('/export'),
+      http.get<Record<string, unknown>>('/metrics'),
+    ]);
+    const m = metricsRes.data;
+    const bfs = (m.bfs as Record<string, unknown>[]) ?? [];
+    return {
+      tree:       rawToTreeNode(exportRes.data.tree),
+      properties: rawToTreeProperties({
+        raiz:       bfs.length ? bfs[0].codigo : null,
+        profundidad: m.height,
+        totalNodos:  m.totalNodes,
+        rotaciones:  m.rotations,
+      }),
+    };
   },
 
   /**
@@ -132,83 +199,122 @@ export const TreeService = {
    */
   async loadTreeFromJSON(
     file: File,
-    mode: 'topology' | 'insertion',
+    _mode: 'topology' | 'insertion',
     criticalDepth: number,
   ): Promise<LoadTreeResponse> {
     const form = new FormData();
-    form.append('file',          file);
-    form.append('mode',          mode);
-    form.append('criticalDepth', String(criticalDepth));
-    const res = await http.post<LoadTreeResponse>('/tree/load', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return res.data;
+    form.append('file', file);
+    const res = await http.post<Record<string, unknown>>(
+      `/upload?critical_depth=${criticalDepth}`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    const d = res.data;
+    const backendMode = String(d.mode ?? '').toUpperCase();
+    return {
+      mode: backendMode === 'TOPOLOGIA' ? 'topology' : 'insertion',
+      avl: {
+        tree:       rawToTreeNode((d.avlTree as RawNode) ?? null),
+        properties: rawToTreeProperties((d.avl as Record<string, unknown>) ?? {}),
+      },
+      bst: rawToTreeNode((d.bstTree as RawNode) ?? null),
+    };
   },
 
   /** REQ §1.3 — exports the full hierarchical tree as a JSON string */
   async exportTreeJSON(): Promise<string> {
-    const res = await http.get('/tree/export', { responseType: 'text' });
-    return res.data as string;
+    const res = await http.get<{ tree: unknown }>('/export');
+    return JSON.stringify(res.data.tree, null, 2);
   },
 
-  /** REQ §1.1 — fetches the BST built in parallel during insertion-mode load */
+  /** REQ §1.1 — BST is built server-side during insertion-mode load; no standalone endpoint. */
   async getBST(): Promise<TreeNode | null> {
-    const res = await http.get<{ bst: TreeNode | null }>('/tree/bst');
-    return res.data.bst;
+    return null;
   },
 
   async resetSystem(): Promise<void> {
-    await http.post('/tree/reset');
+    try { await http.post('/undo'); } catch { /* no-op if nothing to undo */ }
   },
 
   // ── STRESS MODE (REQ §5) ────────────────────────────────────────────────────
 
   async setStressMode(enabled: boolean): Promise<StressModeResponse> {
-    const res = await http.post<StressModeResponse>('/tree/stress', { enabled });
-    return res.data;
+    const res = await http.post<{ stressMode: boolean }>('/trees/stress', { enable: enabled });
+    return {
+      stressMode: res.data.stressMode,
+      message:    enabled ? 'Modo estrés activado.' : 'Modo estrés desactivado.',
+    };
   },
 
   async triggerRebalance(): Promise<RebalanceResult> {
-    const res = await http.post<RebalanceResult>('/tree/rebalance');
-    return res.data;
+    const res = await http.post<Record<string, unknown>>('/trees/rebalance');
+    const d = res.data;
+    return {
+      rotaciones: (d.rotationsApplied as RebalanceResult['rotaciones']) ?? { II: 0, DD: 0, ID: 0, DI: 0 },
+      nodesFixed: (d.nodesFixed as number) ?? 0,
+      tree:       rawToTreeResponse(d),
+    };
   },
 
   // ── AVL AUDIT (REQ §7) ──────────────────────────────────────────────────────
 
   async verifyAVL(): Promise<AVLVerifyResult> {
-    const res = await http.get<AVLVerifyResult>('/tree/verify');
+    const res = await http.get<AVLVerifyResult>('/trees/audit');
     return res.data;
   },
 
   // ── METRICS (REQ §4) ────────────────────────────────────────────────────────
 
   async getMetrics(): Promise<TreeMetrics> {
-    const res = await http.get<TreeMetrics>('/tree/metrics');
-    return res.data;
+    const res = await http.get<Record<string, unknown>>('/metrics');
+    const d = res.data;
+    const bfs = (d.bfs as Record<string, unknown>[]) ?? [];
+    const dfs = (d.dfs as Record<string, unknown>[]) ?? [];
+    return {
+      altura:        (d.height        as number) ?? 0,
+      nodos:         (d.totalNodes    as number) ?? 0,
+      hojas:         (d.leafCount     as number) ?? 0,
+      cancelaciones: (d.massCancellations as number) ?? 0,
+      rotaciones:    toRotaciones(d.rotations as RotacionesBackend | undefined),
+      recorridoBFS:  bfs.map(f => f.codigo as string),
+      recorridoDFS:  dfs.map(f => f.codigo as string),
+    };
   },
 
   // ── CONCURRENCY QUEUE (REQ §3) ─────────────────────────────────────────────
 
   async enqueueFlights(flights: FlightPayload[]): Promise<void> {
-    await http.post('/tree/queue', { flights });
+    for (const f of flights) {
+      await http.post('/queue', f);
+    }
   },
 
   async processQueue(): Promise<QueueProcessResult> {
-    const res = await http.post<QueueProcessResult>('/tree/queue/process');
-    return res.data;
+    const res = await http.post<Record<string, unknown>>('/queue/process');
+    const d = res.data;
+    return {
+      processed:  (d.insertedCodes as string[] | undefined)?.length ?? 1,
+      conflicts:  ((d.conflicts as {codigo: string}[] | undefined) ?? []).map(c => c.codigo),
+      tree:       rawToTreeResponse(d),
+    };
   },
 
   // ── CRITICAL DEPTH (REQ §6) ────────────────────────────────────────────────
 
   async setCriticalDepth(depth: number): Promise<TreeResponse> {
-    const res = await http.post<TreeResponse>('/tree/critical-depth', { depth });
-    return res.data;
+    const res = await http.put<Record<string, unknown>>('/critical-depth', { depth });
+    return rawToTreeResponse(res.data);
   },
 
   // ── MIN-PROFIT DELETE (REQ §8) ─────────────────────────────────────────────
 
   async deleteMinProfit(): Promise<MinProfitResult> {
-    const res = await http.delete<MinProfitResult>('/tree/min-profit');
-    return res.data;
+    const res = await http.delete<Record<string, unknown>>('/eliminate-least-profitable');
+    const d = res.data;
+    return {
+      deleted:  { codigo: (d.cancelledCode as string) ?? '' } as FlightData,
+      subtree:  (d.nodesRemoved as string[]) ?? [],
+      tree:     rawToTreeResponse(d),
+    };
   },
 };
