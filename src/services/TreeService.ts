@@ -80,6 +80,7 @@ function rawToTreeResponse(data: Record<string, unknown>): TreeResponse {
 
 interface FlightListResponse   { flights: FlightData[]; total: number; }
 interface FlightSingleResponse { flight: FlightData; [key: string]: unknown; }
+interface VersionListResponse  { versions: string[]; }
 
 /** REQ §1.1 — result of loading a JSON file */
 export interface LoadTreeResponse {
@@ -113,12 +114,20 @@ export interface RebalanceResult {
 export interface AVLVerifyResult {
   valid:  boolean;
   issues: {
-    codigo:          string;
-    factorEsperado:  number;
-    factorActual:    number;
-    alturaEsperada:  number;
-    alturaActual:    number;
+    code:                 string;
+    balanceFactor:        number;
+    height:               number;
+    missingStoredHeight?: boolean;
+    missingStoredBalanceFactor?: boolean;
+    storedHeight?:        number;
+    storedBalanceFactor?: number;
   }[];
+}
+
+interface RawAVLVerifyResponse {
+  valid?: boolean;
+  inconsistentNodes?: AVLVerifyResult['issues'];
+  issues?: AVLVerifyResult['issues'];
 }
 
 /** REQ §3 — queue process result */
@@ -126,6 +135,63 @@ export interface QueueProcessResult {
   processed:  number;
   conflicts:  string[];
   tree:       TreeResponse;
+}
+
+/** REQ §3 — parallel queue simulation event */
+export interface ParallelSimulationEvent {
+  timestamp: string;
+  workerId: number;
+  codigo: string | null;
+  result: 'inserted' | 'error';
+  message: string | null;
+  conflict?: {
+    hasConflict: boolean;
+    types: string[];
+    rotationDelta: { LL: number; RR: number; LR: number; RL: number };
+    criticalDepth: boolean;
+    rotationTriggered: boolean;
+  } | null;
+}
+
+/** REQ §3 — simulation status snapshot */
+export interface ParallelSimulationStatus {
+  jobId: string;
+  status: 'running' | 'completed' | 'stopped';
+  workers: number;
+  delayMs: number;
+  maxItems: number | null;
+  queueSizeAtStart: number;
+  total: number;
+  claimed: number;
+  processed: number;
+  inserted: number;
+  failed: number;
+  warnings: number;
+  stopRequested: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  progressPercent: number;
+  lastEvents: ParallelSimulationEvent[];
+}
+
+/** REQ §3 — simulation events page */
+export interface ParallelSimulationEventsPage {
+  jobId: string;
+  status: ParallelSimulationStatus['status'];
+  offset: number;
+  limit: number;
+  totalEvents: number;
+  events: ParallelSimulationEvent[];
+}
+
+/** REQ §3 — start simulation response */
+export interface ParallelSimulationStartResult {
+  jobId: string;
+  status: 'running';
+  workers: number;
+  total: number;
+  queueSizeAtStart: number;
+  startedAt: string;
 }
 
 /** REQ §8 — min-profit deletion */
@@ -259,8 +325,11 @@ export const TreeService = {
   // ── AVL AUDIT (REQ §7) ──────────────────────────────────────────────────────
 
   async verifyAVL(): Promise<AVLVerifyResult> {
-    const res = await http.get<AVLVerifyResult>('/trees/audit');
-    return res.data;
+    const res = await http.get<RawAVLVerifyResponse>('/trees/audit');
+    return {
+      valid: Boolean(res.data.valid),
+      issues: res.data.issues ?? res.data.inconsistentNodes ?? [],
+    };
   },
 
   // ── METRICS (REQ §4) ────────────────────────────────────────────────────────
@@ -290,13 +359,53 @@ export const TreeService = {
   },
 
   async processQueue(): Promise<QueueProcessResult> {
-    const res = await http.post<Record<string, unknown>>('/queue/process');
+    const res = await http.post<Record<string, unknown>>('/queue/process-all');
     const d = res.data;
     return {
       processed:  (d.insertedCodes as string[] | undefined)?.length ?? 1,
       conflicts:  ((d.conflicts as {codigo: string}[] | undefined) ?? []).map(c => c.codigo),
       tree:       rawToTreeResponse(d),
     };
+  },
+
+  async startParallelSimulation(options: {
+    workers: number;
+    maxItems?: number;
+    delayMs?: number;
+  }): Promise<ParallelSimulationStartResult> {
+    const payload: { workers: number; maxItems?: number; delayMs?: number } = {
+      workers: options.workers,
+      delayMs: options.delayMs ?? 0,
+    };
+    if (typeof options.maxItems === 'number' && options.maxItems > 0) {
+      payload.maxItems = options.maxItems;
+    }
+    const res = await http.post<ParallelSimulationStartResult>('/queue/simulations/start', payload);
+    return res.data;
+  },
+
+  async getParallelSimulationStatus(jobId: string): Promise<ParallelSimulationStatus> {
+    const safeJobId = encodeURIComponent(jobId);
+    const res = await http.get<ParallelSimulationStatus>(`/queue/simulations/${safeJobId}`);
+    return res.data;
+  },
+
+  async getParallelSimulationEvents(
+    jobId: string,
+    offset = 0,
+    limit = 100,
+  ): Promise<ParallelSimulationEventsPage> {
+    const safeJobId = encodeURIComponent(jobId);
+    const res = await http.get<ParallelSimulationEventsPage>(
+      `/queue/simulations/${safeJobId}/events`,
+      { params: { offset, limit } },
+    );
+    return res.data;
+  },
+
+  async stopParallelSimulation(jobId: string): Promise<void> {
+    const safeJobId = encodeURIComponent(jobId);
+    await http.post(`/queue/simulations/${safeJobId}/stop`);
   },
 
   // ── CRITICAL DEPTH (REQ §6) ────────────────────────────────────────────────
@@ -316,5 +425,30 @@ export const TreeService = {
       subtree:  (d.nodesRemoved as string[]) ?? [],
       tree:     rawToTreeResponse(d),
     };
+  },
+
+  // ── NAMED VERSIONS (REQ §2) ──────────────────────────────────────────────
+
+  async listVersions(): Promise<string[]> {
+    const res = await http.get<VersionListResponse>('/versions');
+    return res.data.versions;
+  },
+
+  async saveVersion(name: string): Promise<string[]> {
+    const safeName = encodeURIComponent(name);
+    const res = await http.post<VersionListResponse>(`/versions/${safeName}`);
+    return res.data.versions;
+  },
+
+  async restoreVersion(name: string): Promise<TreeResponse> {
+    const safeName = encodeURIComponent(name);
+    const res = await http.put<Record<string, unknown>>(`/versions/${safeName}`);
+    return rawToTreeResponse(res.data);
+  },
+
+  async deleteVersion(name: string): Promise<string[]> {
+    const safeName = encodeURIComponent(name);
+    const res = await http.delete<VersionListResponse>(`/versions/${safeName}`);
+    return res.data.versions;
   },
 };

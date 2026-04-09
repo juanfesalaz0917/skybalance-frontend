@@ -14,9 +14,9 @@
  *  - (D) TreeService is the only external dependency.
  */
 
-import { useState, useCallback } from 'react';
-import { TreeService }           from '../services/TreeService';
-import type { TreeResponse }     from '../models/FlightNode';
+import { useCallback, useEffect, useState } from 'react';
+import type { TreeResponse } from '../models/FlightNode';
+import { TreeService } from '../services/TreeService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,9 +31,9 @@ export interface UndoAction {
 
 /** A named version saved by the user (REQ §2). */
 export interface TreeVersion {
-  id:        string;       // nanoid-style unique id
+  id:        string;       // backend version key (same as name)
   name:      string;       // e.g. "Simulación Alta Demanda"
-  snapshot:  TreeResponse;
+  snapshot?: TreeResponse;
   savedAt:   Date;
 }
 
@@ -63,8 +63,10 @@ export interface UseAppStateReturn {
 
   // ── Named versions (REQ §2) ──────────────────────────────────────────────
   versions:         TreeVersion[];
-  saveVersion:      (name: string, snapshot: TreeResponse) => void;
-  deleteVersion:    (id: string) => void;
+  saveVersion:      (name: string) => Promise<void>;
+  restoreVersion:   (id: string) => Promise<void>;
+  deleteVersion:    (id: string) => Promise<void>;
+  refreshVersions:  () => Promise<void>;
 
   // ── Error ─────────────────────────────────────────────────────────────────
   error: string | null;
@@ -82,6 +84,23 @@ export const useAppState = (): UseAppStateReturn => {
   const [undoStack,         setUndoStack]         = useState<UndoAction[]>([]);
   const [versions,          setVersions]          = useState<TreeVersion[]>([]);
   const [error,             setError]             = useState<string | null>(null);
+
+  const refreshVersions = useCallback(async () => {
+    const names = await TreeService.listVersions();
+    setVersions(
+      names.map((name) => ({
+        id: name,
+        name,
+        savedAt: new Date(),
+      })),
+    );
+  }, []);
+
+  useEffect(() => {
+    refreshVersions().catch(() => {
+      setError('No se pudieron cargar las versiones guardadas.');
+    });
+  }, [refreshVersions]);
 
   // ── Stress mode ──────────────────────────────────────────────────────────
 
@@ -153,23 +172,37 @@ export const useAppState = (): UseAppStateReturn => {
 
   // ── Named versions ────────────────────────────────────────────────────────
 
-  /**
-   * REQ §2 — Saves a named version snapshot.
-   * Versions are stored in memory (could be persisted to localStorage if needed).
-   */
-  const saveVersion = useCallback((name: string, snapshot: TreeResponse) => {
-    const version: TreeVersion = {
-      id:       `v-${Date.now()}`,
-      name:     name.trim() || `Versión ${new Date().toLocaleTimeString('es-CO')}`,
-      snapshot,
-      savedAt:  new Date(),
-    };
-    setVersions(prev => [version, ...prev]);
+  /** REQ §2 — Persists a named version in backend and refreshes the list. */
+  const saveVersion = useCallback(async (name: string) => {
+    setError(null);
+    try {
+      const versionName = name.trim() || `Versión ${new Date().toLocaleTimeString('es-CO')}`;
+      await TreeService.saveVersion(versionName);
+      await refreshVersions();
+    } catch {
+      setError('No se pudo guardar la versión.');
+    }
+  }, [refreshVersions]);
+
+  /** REQ §2 — Restores a named backend version. */
+  const restoreVersion = useCallback(async (id: string) => {
+    setError(null);
+    try {
+      await TreeService.restoreVersion(id);
+    } catch {
+      setError('No se pudo restaurar la versión.');
+    }
   }, []);
 
-  const deleteVersion = useCallback((id: string) => {
-    setVersions(prev => prev.filter(v => v.id !== id));
-  }, []);
+  const deleteVersion = useCallback(async (id: string) => {
+    setError(null);
+    try {
+      await TreeService.deleteVersion(id);
+      await refreshVersions();
+    } catch {
+      setError('No se pudo eliminar la versión.');
+    }
+  }, [refreshVersions]);
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -186,7 +219,9 @@ export const useAppState = (): UseAppStateReturn => {
     undoStack,
     versions,
     saveVersion,
+    restoreVersion,
     deleteVersion,
+    refreshVersions,
     error,
     clearError,
   };

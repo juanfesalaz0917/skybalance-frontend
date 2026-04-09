@@ -43,6 +43,9 @@ import type { FlightData } from "./models/FlightNode";
 import type {
   AVLVerifyResult,
   MinProfitResult,
+  ParallelSimulationEventsPage,
+  ParallelSimulationStartResult,
+  ParallelSimulationStatus,
   RebalanceResult,
 } from "./services/TreeService";
 import { TreeService } from "./services/TreeService";
@@ -93,6 +96,7 @@ const App: React.FC = () => {
     undoStack,
     versions,
     saveVersion,
+    restoreVersion,
     deleteVersion,
   } = useAppState();
 
@@ -259,8 +263,12 @@ const App: React.FC = () => {
   // ── REQ §7 — Verify AVL ───────────────────────────────────────────────────
 
   const handleVerifyAVL = async () => {
-    const res = await TreeService.verifyAVL();
-    setAvlVerifyResult(res);
+    try {
+      const res = await TreeService.verifyAVL();
+      setAvlVerifyResult(res);
+    } catch {
+      setAvlVerifyResult({ valid: false, issues: [] });
+    }
   };
 
   // ── REQ §8 — Min-profit delete ────────────────────────────────────────────
@@ -286,21 +294,57 @@ const App: React.FC = () => {
     return { processed: res.processed, conflicts: res.conflicts };
   };
 
+  const handleStartParallelSimulation = async (options: {
+    workers: number;
+    maxItems?: number;
+    delayMs?: number;
+  }): Promise<ParallelSimulationStartResult> => {
+    const res = await TreeService.startParallelSimulation(options);
+    return res;
+  };
+
+  const handleEnqueueFlights = async (
+    pending: Parameters<typeof TreeService.enqueueFlights>[0],
+  ) => {
+    await TreeService.enqueueFlights(pending);
+  };
+
+  const handleGetParallelStatus = async (
+    jobId: string,
+  ): Promise<ParallelSimulationStatus> => {
+    return TreeService.getParallelSimulationStatus(jobId);
+  };
+
+  const handleGetParallelEvents = async (
+    jobId: string,
+    offset: number,
+    limit = 100,
+  ): Promise<ParallelSimulationEventsPage> => {
+    return TreeService.getParallelSimulationEvents(jobId, offset, limit);
+  };
+
+  const handleStopParallelSimulation = async (jobId: string) => {
+    await TreeService.stopParallelSimulation(jobId);
+  };
+
+  const handleParallelMutation = async () => {
+    await refreshFlights();
+    await refreshTree();
+  };
+
   // ── REQ §2 — Version management ──────────────────────────────────────────
 
   const handleSaveVersion = async (name: string) => {
     try {
-      const snapshot = await TreeService.getCurrentTree();
-      saveVersion(name, snapshot);
+      await saveVersion(name);
     } catch {
       /* Silent fail */
     }
   };
 
-  const handleRestoreVersion = async () => {
+  const handleRestoreVersion = async (version: { id: string }) => {
     try {
-      // Same pattern as undo — in production add a POST /api/tree/restore endpoint.
-      await TreeService.resetSystem();
+      await restoreVersion(version.id);
       await refreshFlights();
       await refreshTree();
     } catch {
@@ -382,7 +426,15 @@ const App: React.FC = () => {
               />
             )}
             {sidePanel === "queue" && (
-              <ConcurrencyQueue onProcess={handleProcessQueue} />
+              <ConcurrencyQueue
+                onProcess={handleProcessQueue}
+                onEnqueue={handleEnqueueFlights}
+                onStartParallel={handleStartParallelSimulation}
+                onGetParallelStatus={handleGetParallelStatus}
+                onGetParallelEvents={handleGetParallelEvents}
+                onStopParallel={handleStopParallelSimulation}
+                onParallelMutation={handleParallelMutation}
+              />
             )}
           </div>
         </div>
@@ -422,7 +474,15 @@ const App: React.FC = () => {
               />
             )}
             {sidePanel === "queue" && (
-              <ConcurrencyQueue onProcess={handleProcessQueue} />
+              <ConcurrencyQueue
+                onProcess={handleProcessQueue}
+                onEnqueue={handleEnqueueFlights}
+                onStartParallel={handleStartParallelSimulation}
+                onGetParallelStatus={handleGetParallelStatus}
+                onGetParallelEvents={handleGetParallelEvents}
+                onStopParallel={handleStopParallelSimulation}
+                onParallelMutation={handleParallelMutation}
+              />
             )}
           </div>
         </div>
