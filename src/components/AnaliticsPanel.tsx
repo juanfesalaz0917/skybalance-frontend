@@ -12,13 +12,17 @@
  * SOLID — (S) Only renders metrics. Fetching delegated to parent via props.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
 import {
-  RefreshCw, BarChart2, Leaf, ArrowLeftRight,
-  ChevronDown, ChevronUp, Loader2,
+    ArrowLeftRight,
+    BarChart2,
+    ChevronDown, ChevronUp,
+    Leaf,
+    Loader2,
+    RefreshCw,
 } from 'lucide-react';
-import { TreeService } from '../services/TreeService';
+import React, { useCallback, useEffect, useState } from 'react';
 import type { TreeMetrics } from '../services/TreeService';
+import { TreeService } from '../services/TreeService';
 
 // ─── Sub-component: Stat tile ─────────────────────────────────────────────────
 
@@ -46,6 +50,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
   const [error,      setError]      = useState<string | null>(null);
   const [showBFS,    setShowBFS]    = useState(false);
   const [showDFS,    setShowDFS]    = useState(false);
+  const [showPostOrder, setShowPostOrder] = useState(false);
 
   const fetchMetrics = useCallback(async () => {
     setIsLoading(true);
@@ -189,6 +194,34 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
               <div className="mt-2 bg-zinc-800 rounded-xl p-3 max-h-32 overflow-y-auto">
                 <div className="flex flex-wrap gap-1">
                   {metrics.recorridoDFS.map((code, i) => (
+                    <span
+                      key={`${code}-${i}`}
+                      className="text-[10px] bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded font-mono"
+                    >
+                      {code}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ── Post-Order traversal ── */}
+          <section>
+            <button
+              onClick={() => setShowPostOrder(v => !v)}
+              className="w-full flex items-center justify-between text-zinc-400 hover:text-white
+                         text-[10px] uppercase tracking-wider transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Leaf size={11} /> Recorrido Post-Order ({metrics.recorridoPostOrder.length} nodos)
+              </span>
+              {showPostOrder ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {showPostOrder && (
+              <div className="mt-2 bg-zinc-800 rounded-xl p-3 max-h-32 overflow-y-auto">
+                <div className="flex flex-wrap gap-1">
+                  {metrics.recorridoPostOrder.map((code, i) => (
                     <span
                       key={`${code}-${i}`}
                       className="text-[10px] bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded font-mono"

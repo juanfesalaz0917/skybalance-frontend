@@ -13,10 +13,10 @@
 
 import axios from "axios";
 import type {
-  FlightData,
-  TreeNode,
-  TreeProperties,
-  TreeResponse,
+    FlightData,
+    TreeNode,
+    TreeProperties,
+    TreeResponse,
 } from "../models/FlightNode";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000/api";
@@ -152,6 +152,7 @@ export interface TreeMetrics {
   rotaciones: { II: number; DD: number; ID: number; DI: number };
   recorridoBFS: string[];
   recorridoDFS: string[];
+  recorridoPostOrder: string[];
 }
 
 /** REQ §5 — stress mode toggle response */
@@ -444,6 +445,7 @@ export const TreeService = {
     const d = res.data;
     const bfs = (d.bfs as Record<string, unknown>[]) ?? [];
     const dfs = (d.dfs as Record<string, unknown>[]) ?? [];
+    const postorder = (d.postorder as Record<string, unknown>[]) ?? [];
     return {
       altura: (d.height as number) ?? 0,
       nodos: (d.totalNodes as number) ?? 0,
@@ -452,6 +454,7 @@ export const TreeService = {
       rotaciones: toRotaciones(d.rotations as RotacionesBackend | undefined),
       recorridoBFS: bfs.map((f) => f.codigo as string),
       recorridoDFS: dfs.map((f) => f.codigo as string),
+      recorridoPostOrder: postorder.map((f) => f.codigo as string),
     };
   },
 
