@@ -50,6 +50,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
   const [error,      setError]      = useState<string | null>(null);
   const [showBFS,    setShowBFS]    = useState(false);
   const [showDFS,    setShowDFS]    = useState(false);
+  const [showInOrder, setShowInOrder] = useState(false);
   const [showPostOrder, setShowPostOrder] = useState(false);
 
   const fetchMetrics = useCallback(async () => {
@@ -158,7 +159,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
                          text-[10px] uppercase tracking-wider transition-colors"
             >
               <span className="flex items-center gap-1.5">
-                <ArrowLeftRight size={11} /> Recorrido BFS ({metrics.recorridoBFS.length} nodos)
+                <ArrowLeftRight size={11} /> BFS - Anchura ({metrics.recorridoBFS.length} nodos)
               </span>
               {showBFS ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
@@ -186,7 +187,7 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
                          text-[10px] uppercase tracking-wider transition-colors"
             >
               <span className="flex items-center gap-1.5">
-                <Leaf size={11} /> Recorrido DFS ({metrics.recorridoDFS.length} nodos)
+                <Leaf size={11} /> DFS - Pre-Order ({metrics.recorridoDFS.length} nodos)
               </span>
               {showDFS ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
             </button>
@@ -194,6 +195,34 @@ const AnalyticsPanel: React.FC<AnalyticsPanelProps> = ({ autoRefreshMs = 0 }) =>
               <div className="mt-2 bg-zinc-800 rounded-xl p-3 max-h-32 overflow-y-auto">
                 <div className="flex flex-wrap gap-1">
                   {metrics.recorridoDFS.map((code, i) => (
+                    <span
+                      key={`${code}-${i}`}
+                      className="text-[10px] bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded font-mono"
+                    >
+                      {code}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* ── In-Order traversal ── */}
+          <section>
+            <button
+              onClick={() => setShowInOrder(v => !v)}
+              className="w-full flex items-center justify-between text-zinc-400 hover:text-white
+                         text-[10px] uppercase tracking-wider transition-colors"
+            >
+              <span className="flex items-center gap-1.5">
+                <Leaf size={11} /> Recorrido In-Order ({metrics.recorridoInOrder.length} nodos)
+              </span>
+              {showInOrder ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+            {showInOrder && (
+              <div className="mt-2 bg-zinc-800 rounded-xl p-3 max-h-32 overflow-y-auto">
+                <div className="flex flex-wrap gap-1">
+                  {metrics.recorridoInOrder.map((code, i) => (
                     <span
                       key={`${code}-${i}`}
                       className="text-[10px] bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded font-mono"

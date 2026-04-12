@@ -152,6 +152,7 @@ export interface TreeMetrics {
   rotaciones: { II: number; DD: number; ID: number; DI: number };
   recorridoBFS: string[];
   recorridoDFS: string[];
+  recorridoInOrder: string[];
   recorridoPostOrder: string[];
 }
 
@@ -445,6 +446,7 @@ export const TreeService = {
     const d = res.data;
     const bfs = (d.bfs as Record<string, unknown>[]) ?? [];
     const dfs = (d.dfs as Record<string, unknown>[]) ?? [];
+    const inorder = (d.inorder as Record<string, unknown>[]) ?? [];
     const postorder = (d.postorder as Record<string, unknown>[]) ?? [];
     return {
       altura: (d.height as number) ?? 0,
@@ -454,6 +456,7 @@ export const TreeService = {
       rotaciones: toRotaciones(d.rotations as RotacionesBackend | undefined),
       recorridoBFS: bfs.map((f) => f.codigo as string),
       recorridoDFS: dfs.map((f) => f.codigo as string),
+      recorridoInOrder: inorder.map((f) => f.codigo as string),
       recorridoPostOrder: postorder.map((f) => f.codigo as string),
     };
   },
