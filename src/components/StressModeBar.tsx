@@ -14,33 +14,46 @@
  *         (D) All actions are injected as callbacks.
  */
 
-import React, { useState } from 'react';
 import {
-  Zap, ZapOff, RotateCcw, Download, Undo2,
-  ShieldCheck, TrendingDown, AlertTriangle, Loader2, Settings,
-} from 'lucide-react';
+  AlertTriangle,
+  Download,
+  Eye,
+  EyeOff,
+  Loader2,
+  RotateCcw,
+  Settings,
+  ShieldCheck,
+  TrendingDown,
+  Undo2,
+  Zap,
+  ZapOff,
+} from "lucide-react";
+import React, { useState } from "react";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface StressModeBarProps {
   // ── State ──
-  stressMode:    boolean;
+  stressMode: boolean;
   criticalDepth: number;
-  lastUndoLabel: string | null;   // null = undo stack is empty
+  lastUndoLabel: string | null; // null = undo stack is empty
   isTogglingStress: boolean;
 
   // ── Callbacks ──
-  onToggleStress:       () => void;
-  onRebalance:          () => Promise<void>;
-  onVerifyAVL:          () => Promise<void>;
-  onUndo:               () => void;
-  onExportJSON:         () => void;
-  onDeleteMinProfit:    () => Promise<void>;
-  onCriticalDepthChange:(depth: number) => Promise<void>;
-  onCancelSubtree:      (codigo: string) => Promise<void>;
+  onToggleStress: () => void;
+  onRebalance: () => Promise<void>;
+  onVerifyAVL: () => Promise<void>;
+  onUndo: () => void;
+  onExportJSON: () => void;
+  onDeleteMinProfit: () => Promise<void>;
+  onCriticalDepthChange: (depth: number) => Promise<void>;
+  onCancelSubtree: (codigo: string) => Promise<void>;
 
   // ── Result states ──
-  rebalanceResult?: { rotaciones: Record<string, number>; nodesFixed: number } | null;
+  rebalanceResult?: {
+    rotaciones: Record<string, number>;
+    nodesFixed: number;
+  } | null;
   avlVerifyResult?: { valid: boolean; issues: unknown[] } | null;
   minProfitResult?: { deleted: { codigo: string }; subtree: string[] } | null;
 }
@@ -48,19 +61,31 @@ export interface StressModeBarProps {
 // ─── Sub-component: ToolButton ────────────────────────────────────────────────
 
 const ToolButton: React.FC<{
-  label:    string;
-  icon:     React.ReactNode;
-  onClick:  () => void;
+  label: string;
+  icon: React.ReactNode;
+  onClick: () => void;
   disabled?: boolean;
-  loading?:  boolean;
-  variant?:  'default' | 'danger' | 'warning' | 'success';
-  title?:   string;
-}> = ({ label, icon, onClick, disabled, loading, variant = 'default', title }) => {
+  loading?: boolean;
+  variant?: "default" | "danger" | "warning" | "success";
+  title?: string;
+}> = ({
+  label,
+  icon,
+  onClick,
+  disabled,
+  loading,
+  variant = "default",
+  title,
+}) => {
   const colors = {
-    default: 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border-zinc-700',
-    danger:  'bg-red-900/50 text-red-300 hover:bg-red-800 hover:text-white border-red-800',
-    warning: 'bg-amber-900/50 text-amber-300 hover:bg-amber-800 hover:text-white border-amber-800',
-    success: 'bg-green-900/50 text-green-300 hover:bg-green-800 hover:text-white border-green-800',
+    default:
+      "bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border-zinc-700",
+    danger:
+      "bg-red-900/50 text-red-300 hover:bg-red-800 hover:text-white border-red-800",
+    warning:
+      "bg-amber-900/50 text-amber-300 hover:bg-amber-800 hover:text-white border-amber-800",
+    success:
+      "bg-green-900/50 text-green-300 hover:bg-green-800 hover:text-white border-green-800",
   };
 
   return (
@@ -100,25 +125,42 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
   avlVerifyResult,
   minProfitResult,
 }) => {
-  const [localDepth,     setLocalDepth]     = useState(criticalDepth);
-  const [loadingRebal,   setLoadingRebal]   = useState(false);
-  const [loadingVerify,  setLoadingVerify]  = useState(false);
+  const [localDepth, setLocalDepth] = useState(criticalDepth);
+  const [loadingRebal, setLoadingRebal] = useState(false);
+  const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingMinProfit, setLoadingMinProfit] = useState(false);
   const [showDepthInput, setShowDepthInput] = useState(false);
+  const [showStatusMessages, setShowStatusMessages] = useState(true);
+
+  const hasStatusMessages = Boolean(
+    rebalanceResult || avlVerifyResult || minProfitResult,
+  );
 
   const handleRebalance = async () => {
     setLoadingRebal(true);
-    try { await onRebalance(); } finally { setLoadingRebal(false); }
+    try {
+      await onRebalance();
+    } finally {
+      setLoadingRebal(false);
+    }
   };
 
   const handleVerify = async () => {
     setLoadingVerify(true);
-    try { await onVerifyAVL(); } finally { setLoadingVerify(false); }
+    try {
+      await onVerifyAVL();
+    } finally {
+      setLoadingVerify(false);
+    }
   };
 
   const handleMinProfit = async () => {
     setLoadingMinProfit(true);
-    try { await onDeleteMinProfit(); } finally { setLoadingMinProfit(false); }
+    try {
+      await onDeleteMinProfit();
+    } finally {
+      setLoadingMinProfit(false);
+    }
   };
 
   const handleDepthSubmit = async () => {
@@ -127,19 +169,24 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
   };
 
   return (
-    <div className={`
+    <div
+      className={`
       border-b flex flex-col
-      ${stressMode
-        ? 'bg-red-950/30 border-red-900/60'
-        : 'bg-zinc-900 border-zinc-800'}
-    `}>
+      ${
+        stressMode
+          ? "bg-red-950/30 border-red-900/60"
+          : "bg-zinc-900 border-zinc-800"
+      }
+    `}
+    >
       {/* ── Main toolbar row ── */}
       <div className="flex items-center gap-2 px-4 py-2 flex-wrap">
-
         {/* Stress mode indicator label */}
         {stressMode && (
-          <span className="flex items-center gap-1.5 text-red-400 text-xs font-bold
-                           animate-pulse mr-1">
+          <span
+            className="flex items-center gap-1.5 text-red-400 text-xs font-bold
+                           animate-pulse mr-1"
+          >
             <AlertTriangle size={13} />
             MODO ESTRÉS ACTIVO
           </span>
@@ -147,11 +194,15 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
 
         {/* ── REQ §1.2 — Undo ── */}
         <ToolButton
-          label={lastUndoLabel ? `Deshacer: ${lastUndoLabel}` : 'Deshacer'}
+          label={lastUndoLabel ? `Deshacer: ${lastUndoLabel}` : "Deshacer"}
           icon={<Undo2 size={13} />}
           onClick={onUndo}
           disabled={!lastUndoLabel}
-          title={lastUndoLabel ? `Deshacer: ${lastUndoLabel}` : 'Sin acciones para deshacer'}
+          title={
+            lastUndoLabel
+              ? `Deshacer: ${lastUndoLabel}`
+              : "Sin acciones para deshacer"
+          }
         />
 
         {/* ── REQ §1.3 — Export JSON ── */}
@@ -167,18 +218,20 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
           <ToolButton
             label={`Prof. crítica: ${criticalDepth}`}
             icon={<Settings size={13} />}
-            onClick={() => setShowDepthInput(v => !v)}
+            onClick={() => setShowDepthInput((v) => !v)}
             variant="warning"
           />
           {showDepthInput && (
-            <div className="absolute top-full left-0 mt-1 z-20 bg-zinc-800 border border-zinc-600
-                            rounded-xl p-3 shadow-xl flex items-center gap-2">
+            <div
+              className="absolute top-full left-0 mt-1 z-20 bg-zinc-800 border border-zinc-600
+                            rounded-xl p-3 shadow-xl flex items-center gap-2"
+            >
               <input
                 type="number"
                 min={1}
                 max={20}
                 value={localDepth}
-                onChange={e => setLocalDepth(Number(e.target.value))}
+                onChange={(e) => setLocalDepth(Number(e.target.value))}
                 className="w-16 bg-zinc-700 text-white text-sm px-2 py-1 rounded-lg
                            border border-zinc-600 outline-none focus:border-zinc-400"
                 autoFocus
@@ -202,14 +255,16 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
 
         {/* ── REQ §5 — Stress mode toggle ── */}
         <ToolButton
-          label={stressMode ? 'Rebalanceo Global' : 'Modo Estrés'}
+          label={stressMode ? "Rebalanceo Global" : "Modo Estrés"}
           icon={stressMode ? <ZapOff size={13} /> : <Zap size={13} />}
           onClick={stressMode ? handleRebalance : onToggleStress}
           loading={stressMode ? loadingRebal : isTogglingStress}
-          variant={stressMode ? 'default' : 'warning'}
-          title={stressMode
-            ? 'Salir del modo estrés y rebalancear el árbol completo'
-            : 'Activar modo estrés (sin balanceo automático)'}
+          variant={stressMode ? "default" : "warning"}
+          title={
+            stressMode
+              ? "Salir del modo estrés y rebalancear el árbol completo"
+              : "Activar modo estrés (sin balanceo automático)"
+          }
         />
 
         {/* ── REQ §7 — Verify AVL (only in stress mode) ── */}
@@ -233,72 +288,119 @@ const StressModeBar: React.FC<StressModeBarProps> = ({
           variant="danger"
           title="Cancela el nodo (y su subárbol) de menor rentabilidad. En empate: más profundo; si persiste: código mayor."
         />
+
+        <ToolButton
+          label={showStatusMessages ? "Ocultar mensajes" : "Mostrar mensajes"}
+          icon={showStatusMessages ? <EyeOff size={13} /> : <Eye size={13} />}
+          onClick={() => setShowStatusMessages((v) => !v)}
+          disabled={!hasStatusMessages}
+          title={
+            hasStatusMessages
+              ? showStatusMessages
+                ? "Ocultar banners informativos"
+                : "Mostrar banners informativos"
+              : "No hay mensajes para mostrar"
+          }
+        />
       </div>
 
       {/* ── Result banners ── */}
 
-      {/* Rebalance result (REQ §5) */}
-      {rebalanceResult && (
-        <div className="px-4 pb-2">
-          <div className="bg-green-900/40 border border-green-800 rounded-lg px-3 py-2
-                          flex items-center gap-3 flex-wrap">
-            <RotateCcw size={13} className="text-green-400 flex-shrink-0" />
-            <span className="text-green-300 text-xs font-semibold">Rebalanceo completado</span>
-            <span className="text-green-400 text-xs">
-              {rebalanceResult.nodesFixed} nodos corregidos
-            </span>
-            {(Object.entries(rebalanceResult.rotaciones) as [string, number][])
-              .filter(([, v]) => v > 0)
-              .map(([type, count]) => (
-                <span key={type} className="text-zinc-400 text-xs">
-                  {type}: <span className="text-amber-400 font-semibold">{count}</span>
+      {showStatusMessages && (
+        <>
+          {/* Rebalance result (REQ §5) */}
+          {rebalanceResult && (
+            <div className="px-4 pb-2">
+              <div
+                className="bg-green-900/40 border border-green-800 rounded-lg px-3 py-2
+                          flex items-center gap-3 flex-wrap"
+              >
+                <RotateCcw size={13} className="text-green-400 flex-shrink-0" />
+                <span className="text-green-300 text-xs font-semibold">
+                  Rebalanceo completado
                 </span>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* AVL verify result (REQ §7) */}
-      {avlVerifyResult && (
-        <div className="px-4 pb-2">
-          <div className={`
-            border rounded-lg px-3 py-2 flex items-start gap-3
-            ${avlVerifyResult.valid
-              ? 'bg-green-900/40 border-green-800'
-              : 'bg-red-900/40 border-red-800'}
-          `}>
-            <ShieldCheck size={13} className={`flex-shrink-0 mt-0.5
-              ${avlVerifyResult.valid ? 'text-green-400' : 'text-red-400'}`}
-            />
-            <div>
-              <p className={`text-xs font-semibold
-                ${avlVerifyResult.valid ? 'text-green-300' : 'text-red-300'}`}>
-                {avlVerifyResult.valid ? 'Árbol válido AVL ✓' : `${avlVerifyResult.issues.length} inconsistencias encontradas`}
-              </p>
-              {!avlVerifyResult.valid && (
-                <p className="text-red-400 text-[10px] mt-0.5">
-                  Abre la consola o el panel de árbol para ver los nodos afectados.
-                </p>
-              )}
+                <span className="text-green-400 text-xs">
+                  {rebalanceResult.nodesFixed} nodos corregidos
+                </span>
+                {(
+                  Object.entries(rebalanceResult.rotaciones) as [
+                    string,
+                    number,
+                  ][]
+                )
+                  .filter(([, v]) => v > 0)
+                  .map(([type, count]) => (
+                    <span key={type} className="text-zinc-400 text-xs">
+                      {type}:{" "}
+                      <span className="text-amber-400 font-semibold">
+                        {count}
+                      </span>
+                    </span>
+                  ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Min-profit deletion result (REQ §8) */}
-      {minProfitResult && (
-        <div className="px-4 pb-2">
-          <div className="bg-red-900/40 border border-red-800 rounded-lg px-3 py-2
-                          flex items-center gap-3 flex-wrap">
-            <TrendingDown size={13} className="text-red-400 flex-shrink-0" />
-            <span className="text-red-300 text-xs font-semibold">
-              Cancelado: {minProfitResult.deleted.codigo}
-            </span>
-            <span className="text-zinc-400 text-xs">
-              + {minProfitResult.subtree.length} nodo(s) descendientes eliminados
-            </span>
-          </div>
-        </div>
+          {/* AVL verify result (REQ §7) */}
+          {avlVerifyResult && (
+            <div className="px-4 pb-2">
+              <div
+                className={`
+            border rounded-lg px-3 py-2 flex items-start gap-3
+            ${
+              avlVerifyResult.valid
+                ? "bg-green-900/40 border-green-800"
+                : "bg-red-900/40 border-red-800"
+            }
+          `}
+              >
+                <ShieldCheck
+                  size={13}
+                  className={`flex-shrink-0 mt-0.5
+              ${avlVerifyResult.valid ? "text-green-400" : "text-red-400"}`}
+                />
+                <div>
+                  <p
+                    className={`text-xs font-semibold
+                ${avlVerifyResult.valid ? "text-green-300" : "text-red-300"}`}
+                  >
+                    {avlVerifyResult.valid
+                      ? "Árbol válido AVL ✓"
+                      : `${avlVerifyResult.issues.length} inconsistencias encontradas`}
+                  </p>
+                  {!avlVerifyResult.valid && (
+                    <p className="text-red-400 text-[10px] mt-0.5">
+                      Abre la consola o el panel de árbol para ver los nodos
+                      afectados.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Min-profit deletion result (REQ §8) */}
+          {minProfitResult && (
+            <div className="px-4 pb-2">
+              <div
+                className="bg-red-900/40 border border-red-800 rounded-lg px-3 py-2
+                          flex items-center gap-3 flex-wrap"
+              >
+                <TrendingDown
+                  size={13}
+                  className="text-red-400 flex-shrink-0"
+                />
+                <span className="text-red-300 text-xs font-semibold">
+                  Cancelado: {minProfitResult.deleted.codigo}
+                </span>
+                <span className="text-zinc-400 text-xs">
+                  + {minProfitResult.subtree.length} nodo(s) descendientes
+                  eliminados
+                </span>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
