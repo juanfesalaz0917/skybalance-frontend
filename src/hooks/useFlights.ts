@@ -25,11 +25,11 @@
  *   - A single GET /api/flights is cheap and keeps the UI 100% consistent.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { TreeService } from '../services/TreeService';
-import type { FlightPayload } from '../services/TreeService';
-import type { FlightData } from '../models/FlightNode';
+import axios from "axios";
+import { useCallback, useEffect, useState } from "react";
+import type { FlightData } from "../models/FlightNode";
+import type { FlightPayload } from "../services/TreeService";
+import { TreeService } from "../services/TreeService";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
     const msg: string | undefined = err.response?.data?.error;
     if (msg) return msg;
     if (!err.response) {
-      return 'No se pudo conectar con el servidor. Verifica que el backend esté en localhost:5000.';
+      return "No se pudo conectar con el servidor. Verifica que el backend esté en localhost:5000.";
     }
     return `Error ${err.response.status}: ${err.response.statusText}`;
   }
@@ -62,7 +62,11 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
 const toPayload = (flight: FlightData): FlightPayload => {
   const {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    altura, factorEquilibrio, profundidad, nodoCritico, rentabilidad,
+    altura,
+    factorEquilibrio,
+    profundidad,
+    nodoCritico,
+    rentabilidad,
     ...payload
   } = flight;
   return payload;
@@ -86,19 +90,20 @@ export interface UseFlightsReturn {
   newDraft: () => void;
   /** Forces a fresh GET /api/flights. Call after external changes. */
   refresh: () => Promise<void>;
+  /** Pulls backend state and expands visible list to keep UI/CRUD fully in sync. */
+  syncFromBackend: () => Promise<void>;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export const useFlights = (): UseFlightsReturn => {
-
   // ── State ──────────────────────────────────────────────────────────────────
 
-  const [allFlights, setAllFlights]     = useState<FlightData[]>([]);
-  const [isLoading, setIsLoading]       = useState(true);
-  const [error, setError]               = useState<string | null>(null);
+  const [allFlights, setAllFlights] = useState<FlightData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const [editTarget, setEditTarget]     = useState<FlightData | null>(null);
+  const [editTarget, setEditTarget] = useState<FlightData | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -113,19 +118,35 @@ export const useFlights = (): UseFlightsReturn => {
       const list = await TreeService.listFlights();
       setAllFlights(list);
     } catch (err) {
-      setError(extractErrorMessage(err, 'Error al cargar los vuelos.'));
+      setError(extractErrorMessage(err, "Error al cargar los vuelos."));
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchFlights(); }, [fetchFlights]);
+  const syncFromBackend = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const list = await TreeService.listFlights();
+      setAllFlights(list);
+      setVisibleCount(Math.max(PAGE_SIZE, list.length));
+    } catch (err) {
+      setError(extractErrorMessage(err, "Error al sincronizar vuelos."));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFlights();
+  }, [fetchFlights]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const flights = allFlights.slice(0, visibleCount);
   const hasMore = visibleCount < allFlights.length;
-  const loadMore = () => setVisibleCount(c => c + PAGE_SIZE);
+  const loadMore = () => setVisibleCount((c) => c + PAGE_SIZE);
 
   // ── Optimistic-then-refresh wrapper ───────────────────────────────────────
 
@@ -136,18 +157,18 @@ export const useFlights = (): UseFlightsReturn => {
    */
   const mutate = async (
     localUpdate: (prev: FlightData[]) => FlightData[],
-    apiCall:     () => Promise<unknown>,
+    apiCall: () => Promise<unknown>,
     errorFallback: string,
   ): Promise<void> => {
-    const snapshot = allFlights;       // save for rollback
+    const snapshot = allFlights; // save for rollback
     setError(null);
     setAllFlights(localUpdate(snapshot)); // instant local change
 
     try {
-      await apiCall();                 // hit the backend
-      await fetchFlights();            // re-sync with authoritative server state
+      await apiCall(); // hit the backend
+      await fetchFlights(); // re-sync with authoritative server state
     } catch (err) {
-      setAllFlights(snapshot);         // rollback
+      setAllFlights(snapshot); // rollback
       setError(extractErrorMessage(err, errorFallback));
     }
   };
@@ -163,9 +184,9 @@ export const useFlights = (): UseFlightsReturn => {
    */
   const addFlight = async (flight: FlightData): Promise<void> => {
     await mutate(
-      prev  => [flight, ...prev],
-      ()    => TreeService.createFlight(toPayload(flight)),
-      'Error al crear el vuelo.',
+      (prev) => [flight, ...prev],
+      () => TreeService.createFlight(toPayload(flight)),
+      "Error al crear el vuelo.",
     );
   };
 
@@ -176,9 +197,9 @@ export const useFlights = (): UseFlightsReturn => {
    */
   const updateFlight = async (flight: FlightData): Promise<void> => {
     await mutate(
-      prev  => prev.map(f => f.codigo === flight.codigo ? flight : f),
-      ()    => TreeService.updateFlight(flight.codigo, toPayload(flight)),
-      'Error al actualizar el vuelo.',
+      (prev) => prev.map((f) => (f.codigo === flight.codigo ? flight : f)),
+      () => TreeService.updateFlight(flight.codigo, toPayload(flight)),
+      "Error al actualizar el vuelo.",
     );
   };
 
@@ -187,39 +208,40 @@ export const useFlights = (): UseFlightsReturn => {
    */
   const deleteFlight = async (codigo: string): Promise<void> => {
     await mutate(
-      prev  => prev.filter(f => f.codigo !== codigo),
-      ()    => TreeService.deleteFlight(codigo),
-      'Error al eliminar el vuelo.',
+      (prev) => prev.filter((f) => f.codigo !== codigo),
+      () => TreeService.deleteFlight(codigo),
+      "Error al eliminar el vuelo.",
     );
   };
 
   // ── Edit target ────────────────────────────────────────────────────────────
 
-  const openEditModal  = (flight: FlightData) => setEditTarget(flight);
+  const openEditModal = (flight: FlightData) => setEditTarget(flight);
   const closeEditModal = () => setEditTarget(null);
 
   /**
    * Blank draft for create mode.
    * Computed fields default to 0/false — the backend overwrites them on insert.
    */
-  const newDraft = () => setEditTarget({
-    codigo:           '',
-    origen:           '',
-    destino:          '',
-    horaSalida:       '',
-    precioBase:       0,
-    precioFinal:      0,
-    pasajeros:        0,
-    prioridad:        1,
-    promocion:        false,
-    alerta:           false,
-    // Computed by backend — not editable
-    altura:           0,
-    factorEquilibrio: 0,
-    profundidad:      0,
-    nodoCritico:      false,
-    rentabilidad:     0,
-  });
+  const newDraft = () =>
+    setEditTarget({
+      codigo: "",
+      origen: "",
+      destino: "",
+      horaSalida: "",
+      precioBase: 0,
+      precioFinal: 0,
+      pasajeros: 0,
+      prioridad: 1,
+      promocion: false,
+      alerta: false,
+      // Computed by backend — not editable
+      altura: 0,
+      factorEquilibrio: 0,
+      profundidad: 0,
+      nodoCritico: false,
+      rentabilidad: 0,
+    });
 
   return {
     flights,
@@ -235,5 +257,6 @@ export const useFlights = (): UseFlightsReturn => {
     closeEditModal,
     newDraft,
     refresh: fetchFlights,
+    syncFromBackend,
   };
 };

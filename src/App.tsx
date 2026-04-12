@@ -20,7 +20,7 @@
  *  - (D) Hooks (useFlights, useAppState, useTreeData) are the only dependencies.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import AVLvsBSTModal from "./components/AVLvsBSTModal.tsx";
 
 import FlightModal from "./components/FlightModal";
@@ -87,10 +87,17 @@ const App: React.FC = () => {
     closeEditModal,
     newDraft,
     refresh: refreshFlights,
+    syncFromBackend: syncFlightsFromBackend,
   } = useFlights();
 
   // ── AVL tree data (for tree view) ─────────────────────────────────────────
-  const { refresh: refreshTree } = useTreeData();
+  const {
+    treeRoot,
+    properties,
+    isLoading: treeIsLoading,
+    error: treeError,
+    refresh: refreshTree,
+  } = useTreeData();
 
   // ── Global app state ──────────────────────────────────────────────────────
   const {
@@ -123,6 +130,7 @@ const App: React.FC = () => {
   const [comparativeSnapshot, setComparativeSnapshot] =
     useState<ComparativeSnapshot | null>(null);
   const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
+  const comparativeBootstrapDoneRef = useRef(false);
 
   // ── Advanced action results (for StressModeBar banners) ───────────────────
   const [rebalanceResult, setRebalanceResult] =
@@ -193,10 +201,18 @@ const App: React.FC = () => {
   );
 
   useEffect(() => {
+    if (comparativeBootstrapDoneRef.current) return;
+    comparativeBootstrapDoneRef.current = true;
     refreshComparativeSnapshot(true).catch(() => {
       // Ignore startup comparative fetch failures.
     });
   }, [refreshComparativeSnapshot]);
+
+  const handleFullRefresh = useCallback(async () => {
+    await Promise.all([refreshTree(), syncFlightsFromBackend()]);
+    await refreshComparativeSnapshot();
+    setAnalyticsRefreshKey((v) => v + 1);
+  }, [refreshComparativeSnapshot, refreshTree, syncFlightsFromBackend]);
 
   // ── Save + undo wrapper ───────────────────────────────────────────────────
 
@@ -245,8 +261,7 @@ const App: React.FC = () => {
     try {
       await TreeService.undo();
       performUndo();
-      await refreshFlights();
-      await refreshTree();
+      await Promise.all([refreshTree(), syncFlightsFromBackend()]);
       setAnalyticsRefreshKey((v) => v + 1);
 
       if (lastLoadMode === "insertion") {
@@ -260,8 +275,8 @@ const App: React.FC = () => {
     lastUndo,
     performUndo,
     refreshComparativeSnapshot,
-    refreshFlights,
     refreshTree,
+    syncFlightsFromBackend,
   ]);
 
   // ── REQ §1.1 — Load JSON ──────────────────────────────────────────────────
@@ -292,8 +307,7 @@ const App: React.FC = () => {
       }
 
       await setCriticalDepth(depth);
-      await refreshFlights();
-      await refreshTree();
+      await Promise.all([refreshTree(), syncFlightsFromBackend()]);
       setJsonLoaderOpen(false);
     } catch (err) {
       setJsonError(
@@ -425,9 +439,9 @@ const App: React.FC = () => {
   const handleRestoreVersion = async (version: { id: string }) => {
     try {
       await restoreVersion(version.id);
-      await refreshFlights();
-      await refreshTree();
+      await Promise.all([refreshTree(), syncFlightsFromBackend()]);
       await refreshComparativeSnapshot(true);
+      setAnalyticsRefreshKey((v) => v + 1);
     } catch {
       /* Silent fail */
     }
@@ -516,7 +530,14 @@ const App: React.FC = () => {
             </div>
           )}
           <div className="flex flex-1 overflow-hidden">
-            <TreeView />
+            <TreeView
+              treeRoot={treeRoot}
+              properties={properties}
+              isLoading={treeIsLoading}
+              error={treeError}
+              onRefreshTree={refreshTree}
+              onRefreshAll={handleFullRefresh}
+            />
             {sidePanel === "analytics" && (
               <AnalyticsPanel
                 key={`analytics-tree-${analyticsRefreshKey}`}
