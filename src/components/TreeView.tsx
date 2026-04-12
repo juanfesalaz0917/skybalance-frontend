@@ -314,46 +314,65 @@ const PropertiesBar: React.FC<{
   properties: TreeProperties;
   onRefresh: () => void;
   isLoading: boolean;
-}> = ({ properties, onRefresh, isLoading }) => (
-  <div className="bg-black border-b border-zinc-800 px-6 py-2.5 flex items-center gap-6 flex-wrap">
-    <span className="text-zinc-400 text-xs">
-      Raíz:{" "}
-      <span className="text-white font-semibold">{properties.raiz ?? "—"}</span>
-    </span>
-    <span className="text-zinc-400 text-xs">
-      Altura:{" "}
-      <span className="text-blue-400 font-semibold">{properties.altura}</span>
-    </span>
-    <span className="text-zinc-400 text-xs">
-      Nodos:{" "}
-      <span className="text-green-400 font-semibold">{properties.nodos}</span>
-    </span>
+  showComparativeButton?: boolean;
+  onOpenComparative?: () => void;
+}> = ({
+  properties,
+  onRefresh,
+  isLoading,
+  showComparativeButton,
+  onOpenComparative,
+}) => (
+  <div className="bg-black border-b border-zinc-800 px-3 md:px-4 py-2">
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {showComparativeButton && onOpenComparative && (
+        <button
+          onClick={onOpenComparative}
+          className="inline-flex items-center rounded-md border border-zinc-700 bg-zinc-800 px-2.5 py-1 text-[11px] font-semibold text-zinc-200 hover:bg-zinc-700"
+        >
+          Ver comparativo AVL vs BST
+        </button>
+      )}
 
-    {/* Rotation breakdown — requirement §4 */}
-    <div className="flex items-center gap-2">
-      <span className="text-zinc-600 text-[10px] uppercase tracking-wider">
-        Rotaciones:
+      <span className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-400">
+        <span className="text-zinc-500">Raíz</span>
+        <span className="text-white font-semibold">
+          {properties.raiz ?? "—"}
+        </span>
       </span>
+      <span className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-400">
+        <span className="text-zinc-500">Altura</span>
+        <span className="text-blue-400 font-semibold">{properties.altura}</span>
+      </span>
+      <span className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-400">
+        <span className="text-zinc-500">Nodos</span>
+        <span className="text-green-400 font-semibold">{properties.nodos}</span>
+      </span>
+
       {(["II", "DD", "ID", "DI"] as const).map((type) => (
-        <span key={type} className="text-zinc-400 text-[10px]">
-          {type}:{" "}
+        <span
+          key={type}
+          className="inline-flex items-center gap-1 rounded-md border border-zinc-800 bg-zinc-900/70 px-2 py-0.5 text-[10px] text-zinc-400"
+        >
+          <span className="text-zinc-500">{type}</span>
           <span className="text-amber-400 font-semibold">
             {properties.rotaciones[type]}
           </span>
         </span>
       ))}
-    </div>
 
-    <button
-      onClick={onRefresh}
-      disabled={isLoading}
-      aria-label="Refrescar árbol"
-      className="ml-auto flex items-center gap-1.5 text-zinc-400 hover:text-white
-                 text-xs transition-colors duration-150 disabled:opacity-40"
-    >
-      <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
-      Refrescar
-    </button>
+      <button
+        onClick={onRefresh}
+        disabled={isLoading}
+        aria-label="Refrescar árbol"
+        className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900 px-2.5 py-1
+                   text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors duration-150
+                   disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
+        Refrescar
+      </button>
+    </div>
   </div>
 );
 
@@ -572,6 +591,8 @@ interface TreeViewProps {
   error: string | null;
   onRefreshTree: () => Promise<void>;
   onRefreshAll?: () => Promise<void>;
+  showComparativeButton?: boolean;
+  onOpenComparative?: () => void;
 }
 
 /**
@@ -589,6 +610,8 @@ const TreeView: React.FC<TreeViewProps> = ({
   error,
   onRefreshTree,
   onRefreshAll,
+  showComparativeButton,
+  onOpenComparative,
 }) => {
   // ── Layout ──────────────────────────────────────────────────────────────────
   const layout = useMemo(() => buildLayout(treeRoot), [treeRoot]);
@@ -676,6 +699,8 @@ const TreeView: React.FC<TreeViewProps> = ({
       {properties && (
         <PropertiesBar
           properties={properties}
+          showComparativeButton={showComparativeButton}
+          onOpenComparative={onOpenComparative}
           onRefresh={() => {
             if (onRefreshAll) {
               void onRefreshAll();

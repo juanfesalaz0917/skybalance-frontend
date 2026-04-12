@@ -519,16 +519,6 @@ const App: React.FC = () => {
             avlVerifyResult={avlVerifyResult}
             minProfitResult={minProfitResult}
           />
-          {canReopenComparative && (
-            <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-900">
-              <button
-                onClick={() => setComparativeOpen(true)}
-                className="text-xs font-semibold text-zinc-200 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 hover:bg-zinc-700"
-              >
-                Ver comparativo AVL vs BST
-              </button>
-            </div>
-          )}
           <div className="flex flex-1 overflow-hidden">
             <TreeView
               treeRoot={treeRoot}
@@ -537,6 +527,8 @@ const App: React.FC = () => {
               error={treeError}
               onRefreshTree={refreshTree}
               onRefreshAll={handleFullRefresh}
+              showComparativeButton={canReopenComparative}
+              onOpenComparative={() => setComparativeOpen(true)}
             />
             {sidePanel === "analytics" && (
               <AnalyticsPanel
