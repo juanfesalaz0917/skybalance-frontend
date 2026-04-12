@@ -15,19 +15,19 @@
  *  - Replace with localStorage if you need persistence across sessions.
  */
 
-import { useState } from 'react';
+import { useState } from "react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SESSION_KEY = 'skybalance_auth';
+const SESSION_KEY = "skybalance_auth";
 
 /**
  * Demo credentials.
  * Replace this with a real call to your Python backend when ready.
  */
 const DEMO_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin123',
+  username: "admin",
+  password: "admin123",
 } as const;
 
 // ─── Return Interface ─────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export interface UseAuthReturn {
 export const useAuth = (): UseAuthReturn => {
   // Initialise from sessionStorage so a page refresh doesn't kick the user out.
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(
-    () => sessionStorage.getItem(SESSION_KEY) === 'true',
+    () => sessionStorage.getItem(SESSION_KEY) === "true",
   );
 
   /**
@@ -74,10 +74,10 @@ export const useAuth = (): UseAuthReturn => {
       password === DEMO_CREDENTIALS.password;
 
     if (!valid) {
-      throw new Error('Credenciales inválidas.');
+      throw new Error("Credenciales inválidas.");
     }
 
-    sessionStorage.setItem(SESSION_KEY, 'true');
+    sessionStorage.setItem(SESSION_KEY, "true");
     setIsAuthenticated(true);
   };
 

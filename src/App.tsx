@@ -21,6 +21,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
+import AVLvsBSTModal from "./components/AVLvsBSTModal";
 
 import FlightModal from "./components/FlightModal";
 import JSONLoader from "./components/JSONLoader";
@@ -39,9 +40,10 @@ import { useTreeData } from "./hooks/useTreeData";
 import AnalyticsPanel from "./components/AnaliticsPanel";
 import FlightsPage from "./components/Flightspage";
 import LoginPage from "./components/LoginPage";
-import type { FlightData } from "./models/FlightNode";
+import type { FlightData, TreeNode } from "./models/FlightNode";
 import type {
   AVLVerifyResult,
+  ComparativeTreeStats,
   MinProfitResult,
   ParallelSimulationEventsPage,
   ParallelSimulationStartResult,
@@ -56,6 +58,13 @@ type ModalMode = "create" | "edit" | null;
 
 /** Controls which right side-panel is visible in the dashboard. */
 type SidePanel = "analytics" | "versions" | "queue" | null;
+
+interface ComparativeSnapshot {
+  avlTree: TreeNode | null;
+  bstTree: TreeNode | null;
+  avlStats?: ComparativeTreeStats;
+  bstStats?: ComparativeTreeStats | null;
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -107,6 +116,12 @@ const App: React.FC = () => {
   const [jsonLoaderOpen, setJsonLoaderOpen] = useState(false);
   const [jsonLoading, setJsonLoading] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
+  const [lastLoadMode, setLastLoadMode] = useState<
+    "topology" | "insertion" | null
+  >(null);
+  const [comparativeOpen, setComparativeOpen] = useState(false);
+  const [comparativeSnapshot, setComparativeSnapshot] =
+    useState<ComparativeSnapshot | null>(null);
 
   // ── Advanced action results (for StressModeBar banners) ───────────────────
   const [rebalanceResult, setRebalanceResult] =
@@ -219,7 +234,23 @@ const App: React.FC = () => {
     setJsonLoading(true);
     setJsonError(null);
     try {
-      await TreeService.loadTreeFromJSON(file, mode, depth);
+      const loaded = await TreeService.loadTreeFromJSON(file, mode, depth);
+
+      if (loaded.mode === "insertion" && loaded.bst) {
+        setLastLoadMode("insertion");
+        setComparativeSnapshot({
+          avlTree: loaded.avl.tree,
+          bstTree: loaded.bst,
+          avlStats: loaded.avlStats,
+          bstStats: loaded.bstStats,
+        });
+        setComparativeOpen(true);
+      } else {
+        setLastLoadMode("topology");
+        setComparativeSnapshot(null);
+        setComparativeOpen(false);
+      }
+
       await setCriticalDepth(depth);
       await refreshFlights();
       await refreshTree();
@@ -360,6 +391,9 @@ const App: React.FC = () => {
 
   // ─── Dashboard ────────────────────────────────────────────────────────────
 
+  const canReopenComparative =
+    lastLoadMode === "insertion" && Boolean(comparativeSnapshot?.bstTree);
+
   const sharedNavbar = (
     <Navbar
       onSearch={() => {}}
@@ -391,6 +425,15 @@ const App: React.FC = () => {
         onClose={handleCloseModal}
       />
 
+      <AVLvsBSTModal
+        isOpen={comparativeOpen && Boolean(comparativeSnapshot)}
+        avlTree={comparativeSnapshot?.avlTree ?? null}
+        bstTree={comparativeSnapshot?.bstTree ?? null}
+        avlStats={comparativeSnapshot?.avlStats}
+        bstStats={comparativeSnapshot?.bstStats ?? null}
+        onClose={() => setComparativeOpen(false)}
+      />
+
       {/* ── Tree view ── */}
       {viewMode === "tree" ? (
         <div className="flex flex-col h-screen bg-zinc-950">
@@ -412,6 +455,16 @@ const App: React.FC = () => {
             avlVerifyResult={avlVerifyResult}
             minProfitResult={minProfitResult}
           />
+          {canReopenComparative && (
+            <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-900">
+              <button
+                onClick={() => setComparativeOpen(true)}
+                className="text-xs font-semibold text-zinc-200 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 hover:bg-zinc-700"
+              >
+                Ver comparativo AVL vs BST
+              </button>
+            </div>
+          )}
           <div className="flex flex-1 overflow-hidden">
             <TreeView />
             {sidePanel === "analytics" && (
@@ -441,6 +494,16 @@ const App: React.FC = () => {
       ) : (
         /* ── List view ── */
         <div className="flex flex-col min-h-screen">
+          {canReopenComparative && (
+            <div className="px-4 pt-3">
+              <button
+                onClick={() => setComparativeOpen(true)}
+                className="text-xs font-semibold text-zinc-100 bg-black border border-zinc-700 rounded-lg px-3 py-1.5 hover:bg-zinc-800"
+              >
+                Ver comparativo AVL vs BST
+              </button>
+            </div>
+          )}
           <FlightsPage
             flights={flights}
             isLoading={isLoading}
