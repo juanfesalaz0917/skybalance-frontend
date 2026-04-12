@@ -21,7 +21,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from "react";
-import AVLvsBSTModal from "./components/AVLvsBSTModal";
+import AVLvsBSTModal from "./components/AVLvsBSTModal.tsx";
 
 import FlightModal from "./components/FlightModal";
 import JSONLoader from "./components/JSONLoader";
@@ -122,6 +122,7 @@ const App: React.FC = () => {
   const [comparativeOpen, setComparativeOpen] = useState(false);
   const [comparativeSnapshot, setComparativeSnapshot] =
     useState<ComparativeSnapshot | null>(null);
+  const [analyticsRefreshKey, setAnalyticsRefreshKey] = useState(0);
 
   // ── Advanced action results (for StressModeBar banners) ───────────────────
   const [rebalanceResult, setRebalanceResult] =
@@ -163,19 +164,46 @@ const App: React.FC = () => {
     closeEditModal();
   };
 
+  const refreshComparativeSnapshot = useCallback(
+    async (force = false) => {
+      if (!force && lastLoadMode !== "insertion") return;
+
+      try {
+        const snapshot = await TreeService.getCurrentComparativeSnapshot();
+
+        if (snapshot.mode === "insertion" && snapshot.bst) {
+          setLastLoadMode("insertion");
+          setComparativeSnapshot({
+            avlTree: snapshot.avl.tree,
+            bstTree: snapshot.bst,
+            avlStats: snapshot.avlStats,
+            bstStats: snapshot.bstStats,
+          });
+          return;
+        }
+
+        setLastLoadMode("topology");
+        setComparativeSnapshot(null);
+        setComparativeOpen(false);
+      } catch {
+        // Keep previous comparative state if backend snapshot fetch fails.
+      }
+    },
+    [lastLoadMode],
+  );
+
+  useEffect(() => {
+    refreshComparativeSnapshot(true).catch(() => {
+      // Ignore startup comparative fetch failures.
+    });
+  }, [refreshComparativeSnapshot]);
+
   // ── Save + undo wrapper ───────────────────────────────────────────────────
 
-  /**
-   * Before any mutation, snapshots the current tree into the undo stack (REQ §1.2).
-   */
+  /** Registers an undoable action label after a successful mutation. */
   const withUndo = async (description: string, action: () => Promise<void>) => {
-    try {
-      const treeSnapshot = await TreeService.getCurrentTree();
-      pushUndo(description, treeSnapshot);
-    } catch {
-      /* Snapshot failed — still allow the action */
-    }
     await action();
+    pushUndo(description);
   };
 
   const handleSave = async (flight: FlightData) => {
@@ -188,14 +216,16 @@ const App: React.FC = () => {
       else await updateFlight(flight);
     });
     handleCloseModal();
-    refreshTree();
+    await refreshTree();
+    await refreshComparativeSnapshot();
   };
 
   const handleDelete = async (codigo: string) => {
     await withUndo(`Eliminar vuelo ${codigo}`, async () => {
       await deleteFlight(codigo);
     });
-    refreshTree();
+    await refreshTree();
+    await refreshComparativeSnapshot();
   };
 
   /** REQ §1.2 — Cancels a node AND all its descendants */
@@ -204,25 +234,35 @@ const App: React.FC = () => {
       await TreeService.cancelFlight(codigo);
       await refreshFlights();
     });
-    refreshTree();
+    await refreshTree();
+    await refreshComparativeSnapshot();
   };
 
   // ── Undo ──────────────────────────────────────────────────────────────────
 
   const handleUndo = useCallback(async () => {
-    const action = performUndo();
-    if (!action) return;
+    if (!lastUndo) return;
     try {
-      // Restore snapshot — here we tell the backend to load this tree state.
-      // Since there is no generic "restore snapshot" endpoint, we reset and reload.
-      // In production, add POST /api/tree/restore { tree: action.snapshot }.
-      await TreeService.resetSystem();
+      await TreeService.undo();
+      performUndo();
       await refreshFlights();
       await refreshTree();
+      setAnalyticsRefreshKey((v) => v + 1);
+
+      if (lastLoadMode === "insertion") {
+        await refreshComparativeSnapshot();
+      }
     } catch {
       /* Restore failed silently */
     }
-  }, [performUndo, refreshFlights, refreshTree]);
+  }, [
+    lastLoadMode,
+    lastUndo,
+    performUndo,
+    refreshComparativeSnapshot,
+    refreshFlights,
+    refreshTree,
+  ]);
 
   // ── REQ §1.1 — Load JSON ──────────────────────────────────────────────────
 
@@ -289,6 +329,7 @@ const App: React.FC = () => {
     await toggleStressMode(); // exits stress mode
     await refreshFlights();
     await refreshTree();
+    await refreshComparativeSnapshot();
   };
 
   // ── REQ §7 — Verify AVL ───────────────────────────────────────────────────
@@ -318,11 +359,18 @@ const App: React.FC = () => {
   const handleProcessQueue = async (
     pending: Parameters<typeof TreeService.enqueueFlights>[0],
   ) => {
-    await TreeService.enqueueFlights(pending);
-    const res = await TreeService.processQueue();
+    let processed = 0;
+    let conflicts: string[] = [];
+    await withUndo(`Procesar cola (${pending.length} vuelo(s))`, async () => {
+      await TreeService.enqueueFlights(pending);
+      const res = await TreeService.processQueue();
+      processed = res.processed;
+      conflicts = res.conflicts;
+    });
     await refreshFlights();
     await refreshTree();
-    return { processed: res.processed, conflicts: res.conflicts };
+    await refreshComparativeSnapshot();
+    return { processed, conflicts };
   };
 
   const handleStartParallelSimulation = async (options: {
@@ -361,6 +409,7 @@ const App: React.FC = () => {
   const handleParallelMutation = async () => {
     await refreshFlights();
     await refreshTree();
+    await refreshComparativeSnapshot();
   };
 
   // ── REQ §2 — Version management ──────────────────────────────────────────
@@ -378,6 +427,7 @@ const App: React.FC = () => {
       await restoreVersion(version.id);
       await refreshFlights();
       await refreshTree();
+      await refreshComparativeSnapshot(true);
     } catch {
       /* Silent fail */
     }
@@ -468,7 +518,10 @@ const App: React.FC = () => {
           <div className="flex flex-1 overflow-hidden">
             <TreeView />
             {sidePanel === "analytics" && (
-              <AnalyticsPanel autoRefreshMs={5000} />
+              <AnalyticsPanel
+                key={`analytics-tree-${analyticsRefreshKey}`}
+                autoRefreshMs={5000}
+              />
             )}
             {sidePanel === "versions" && (
               <VersioningPanel
@@ -527,7 +580,9 @@ const App: React.FC = () => {
           />
           {/* Side panels also available in list view */}
           <div className="fixed right-0 top-[57px] bottom-0 flex z-30">
-            {sidePanel === "analytics" && <AnalyticsPanel />}
+            {sidePanel === "analytics" && (
+              <AnalyticsPanel key={`analytics-list-${analyticsRefreshKey}`} />
+            )}
             {sidePanel === "versions" && (
               <VersioningPanel
                 versions={versions}

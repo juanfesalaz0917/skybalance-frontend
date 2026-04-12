@@ -353,6 +353,30 @@ export const TreeService = {
     };
   },
 
+  /**
+   * Returns a live comparative snapshot (AVL + BST + stats) from backend.
+   * Intended to keep the comparative modal in sync after mutations.
+   */
+  async getCurrentComparativeSnapshot(): Promise<LoadTreeResponse> {
+    const res = await http.get<Record<string, unknown>>(
+      "/trees/comparison/current",
+    );
+    const d = res.data;
+    const backendMode = String(d.mode ?? "").toUpperCase();
+    return {
+      mode: backendMode === "TOPOLOGIA" ? "topology" : "insertion",
+      avl: {
+        tree: rawToTreeNode((d.avlTree as RawNode) ?? null),
+        properties: rawToTreeProperties(
+          (d.avl as Record<string, unknown>) ?? {},
+        ),
+      },
+      bst: rawToTreeNode((d.bstTree as RawNode) ?? null),
+      avlStats: rawToComparativeStats(d.avl) ?? undefined,
+      bstStats: rawToComparativeStats(d.bst),
+    };
+  },
+
   /** REQ §1.3 — exports the full hierarchical tree as a JSON string */
   async exportTreeJSON(): Promise<string> {
     const res = await http.get<{ tree: unknown }>("/export");
@@ -364,9 +388,13 @@ export const TreeService = {
     return null;
   },
 
+  async undo(): Promise<void> {
+    await http.post("/undo");
+  },
+
   async resetSystem(): Promise<void> {
     try {
-      await http.post("/undo");
+      await this.undo();
     } catch {
       /* no-op if nothing to undo */
     }
