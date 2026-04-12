@@ -13,15 +13,15 @@
  *        FlightsPage never imports TreeService directly.
  */
 
-import React, { useState, useMemo } from 'react';
-import { Plus, ChevronDown, Loader2, ServerCrash } from 'lucide-react';
-import Navbar       from './Navbar';
-import FlightCard   from './Flightcard';
-import type { FlightData } from '../models/FlightNode';
+import { ChevronDown, Loader2, Plus, ServerCrash } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import type { FlightData } from "../models/FlightNode";
+import FlightCard from "./Flightcard";
+import Navbar from "./Navbar";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SidePanel = 'analytics' | 'versions' | 'queue' | null;
+type SidePanel = "analytics" | "versions" | "queue" | null;
 
 // ─── Props Interfaces ─────────────────────────────────────────────────────────
 
@@ -30,10 +30,10 @@ type SidePanel = 'analytics' | 'versions' | 'queue' | null;
  * All optional — omitting one hides that button on the card.
  */
 export interface FlightCardActions {
-  onEdit?:     (flight: FlightData) => void;
-  onDelete?:   (codigo: string) => void;
+  onEdit?: (flight: FlightData) => void;
+  onDelete?: (codigo: string) => void;
   /** REQ §1.2 — cancels the node AND all its descendants. */
-  onCancel?:   (codigo: string) => Promise<void>;
+  onCancel?: (codigo: string) => Promise<void>;
   onMoreInfo?: (flight: FlightData) => void;
 }
 
@@ -41,25 +41,25 @@ export interface FlightCardActions {
  * Props for the FlightsPage component.
  */
 export interface FlightsPageProps {
-  flights:       FlightData[];
-  isLoading?:    boolean;
-  error?:        string | null;
+  flights: FlightData[];
+  isLoading?: boolean;
+  error?: string | null;
   onCreateFlight: () => void;
-  onLoadMore:    () => void;
-  hasMore?:      boolean;
-  actions?:      FlightCardActions;
+  onLoadMore: () => void;
+  hasMore?: boolean;
+  actions?: FlightCardActions;
 
   // ── Navbar passthrough props ──────────────────────────────────────────────
   /** Called when the hamburger / logout button is clicked. */
-  onMenuToggle?:      () => void;
+  onMenuToggle?: () => void;
   /** Current active view — drives the Navbar toggle buttons. */
-  viewMode?:          'list' | 'tree';
+  viewMode?: "list" | "tree";
   /** Called when the user switches views in the Navbar. */
-  onViewChange?:      (mode: 'list' | 'tree') => void;
+  onViewChange?: (mode: "list" | "tree") => void;
   /** Opens the JSON loader modal (REQ §1.1). */
-  onOpenLoader?:      () => void;
+  onOpenLoader?: () => void;
   /** Which side panel is currently open. */
-  sidePanel?:         SidePanel;
+  sidePanel?: SidePanel;
   /** Called when the user toggles a side panel in the Navbar. */
   onSidePanelChange?: (panel: SidePanel) => void;
 }
@@ -68,21 +68,21 @@ export interface FlightsPageProps {
 
 const FlightsPage: React.FC<FlightsPageProps> = ({
   flights,
-  isLoading       = false,
-  error           = null,
+  isLoading = false,
+  error = null,
   onCreateFlight,
   onLoadMore,
-  hasMore         = false,
+  hasMore = false,
   actions,
   // Navbar props — safe defaults so FlightsPage still works standalone
-  onMenuToggle       = () => {},
-  viewMode           = 'list',
-  onViewChange       = () => {},
-  onOpenLoader       = () => {},
-  sidePanel          = null,
-  onSidePanelChange  = () => {},
+  onMenuToggle = () => {},
+  viewMode = "list",
+  onViewChange = () => {},
+  onOpenLoader = () => {},
+  sidePanel = null,
+  onSidePanelChange = () => {},
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   /**
    * Client-side filter — re-runs only when `flights` or `searchQuery` changes.
@@ -93,7 +93,7 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
     const q = searchQuery.toLowerCase();
     return flights.filter(
       (f) =>
-        f.origen.toLowerCase().includes(q)  ||
+        f.origen.toLowerCase().includes(q) ||
         f.destino.toLowerCase().includes(q) ||
         f.codigo.toLowerCase().includes(q),
     );
@@ -103,7 +103,8 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
     <div
       className="min-h-screen flex flex-col"
       style={{
-        backgroundImage: 'linear-gradient(160deg, #e8e8e8 0%, #f5f5f5 50%, #dcdcdc 100%)',
+        backgroundImage:
+          "linear-gradient(160deg, #e8e8e8 0%, #f5f5f5 50%, #dcdcdc 100%)",
       }}
     >
       {/* ── Top navigation bar ── */}
@@ -124,7 +125,6 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
 
       {/* ── Page body ── */}
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 py-8">
-
         {/* Header: title + create button */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
@@ -142,11 +142,13 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
               rounded
             "
           >
-            <div className="
+            <div
+              className="
               w-10 h-10 rounded-xl border-2 border-gray-900
               flex items-center justify-center
               hover:bg-gray-900 hover:text-white transition-colors duration-150
-            ">
+            "
+            >
               <Plus size={22} />
             </div>
             <span className="text-xs font-semibold">Crear</span>
@@ -159,13 +161,14 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
             <Loader2 size={40} className="animate-spin" />
             <p className="text-sm">Cargando vuelos…</p>
           </div>
-
         ) : error ? (
-          <div role="alert" className="flex flex-col items-center justify-center py-20 gap-3 text-red-600">
+          <div
+            role="alert"
+            className="flex flex-col items-center justify-center py-20 gap-3 text-red-600"
+          >
             <ServerCrash size={40} />
             <p className="text-sm font-medium">{error}</p>
           </div>
-
         ) : filteredFlights.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-2 text-gray-400">
             <p className="text-base font-medium">No se encontraron vuelos.</p>
@@ -173,15 +176,19 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
               <p className="text-sm">Intenta con otro término de búsqueda.</p>
             )}
           </div>
-
         ) : (
-          <div className="flex flex-col gap-4" role="list" aria-label="Lista de vuelos">
+          <div
+            className="flex flex-col gap-4"
+            role="list"
+            aria-label="Lista de vuelos"
+          >
             {filteredFlights.map((flight) => (
               <div key={flight.codigo} role="listitem">
                 <FlightCard
                   flight={flight}
                   onEdit={actions?.onEdit}
                   onDelete={actions?.onDelete}
+                  onCancel={actions?.onCancel}
                   onMoreInfo={actions?.onMoreInfo}
                 />
               </div>
@@ -211,7 +218,8 @@ const FlightsPage: React.FC<FlightsPageProps> = ({
 
       {/* ── Footer ── */}
       <footer className="bg-black text-gray-400 text-center text-xs py-4 mt-auto">
-        © {new Date().getFullYear()} SkyBalance Airlines | Todos los derechos reservados.
+        © {new Date().getFullYear()} SkyBalance Airlines | Todos los derechos
+        reservados.
       </footer>
     </div>
   );

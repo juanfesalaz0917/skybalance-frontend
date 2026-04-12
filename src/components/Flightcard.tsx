@@ -15,9 +15,18 @@
  *  - (D) Dependency Inversion: No service or router imported; actions are pure callbacks.
  */
 
-import React from 'react';
-import { Plane, Globe, Clock, Pencil, Trash2, MoreHorizontal, AlertTriangle, Tag } from 'lucide-react';
-import type { FlightData } from '../models/FlightNode';
+import {
+  AlertTriangle,
+  Clock,
+  Globe,
+  MoreHorizontal,
+  Pencil,
+  Plane,
+  Tag,
+  Trash2,
+} from "lucide-react";
+import React from "react";
+import type { FlightData } from "../models/FlightNode";
 
 // ─── Props Interface ──────────────────────────────────────────────────────────
 
@@ -31,6 +40,8 @@ export interface FlightCardProps {
   onEdit?: (flight: FlightData) => void;
   /** Called when the user clicks "Eliminar". Optional — hides button if omitted. */
   onDelete?: (codigo: string) => void;
+  /** Called when the user clicks "Cancelar subárbol". Optional — hides button if omitted. */
+  onCancel?: (codigo: string) => Promise<void>;
   /** Called when the user clicks "Más información". Optional — hides button if omitted. */
   onMoreInfo?: (flight: FlightData) => void;
 }
@@ -43,10 +54,19 @@ export interface FlightCardProps {
  *
  * This logic is extracted into a pure helper so FlightCard stays lean (SRP).
  */
-const INTERNATIONAL_KEYWORDS = ['Madrid', 'Miami', 'New York', 'Paris', 'London', 'Ciudad de México'];
+const INTERNATIONAL_KEYWORDS = [
+  "Madrid",
+  "Miami",
+  "New York",
+  "Paris",
+  "London",
+  "Ciudad de México",
+];
 
 const isInternational = (destino: string): boolean =>
-  INTERNATIONAL_KEYWORDS.some((city) => destino.toLowerCase().includes(city.toLowerCase()));
+  INTERNATIONAL_KEYWORDS.some((city) =>
+    destino.toLowerCase().includes(city.toLowerCase()),
+  );
 
 // ─── Helper: format departure time ───────────────────────────────────────────
 
@@ -59,7 +79,10 @@ const formatTime = (horaSalida: string): string => {
     // Support both "HH:MM" and full ISO strings
     if (horaSalida.length <= 5) return horaSalida;
     const date = new Date(horaSalida);
-    return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString("es-CO", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return horaSalida;
   }
@@ -75,10 +98,15 @@ interface ActionButtonProps {
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
-  variant?: 'default' | 'danger';
+  variant?: "default" | "danger" | "warning";
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({ label, icon, onClick, variant = 'default' }) => (
+const ActionButton: React.FC<ActionButtonProps> = ({
+  label,
+  icon,
+  onClick,
+  variant = "default",
+}) => (
   <button
     onClick={onClick}
     aria-label={label}
@@ -88,9 +116,12 @@ const ActionButton: React.FC<ActionButtonProps> = ({ label, icon, onClick, varia
       transition-colors duration-150
       focus-visible:outline focus-visible:outline-2 focus-visible:outline-gray-700
       rounded px-1
-      ${variant === 'danger'
-        ? 'text-gray-600 hover:text-red-600'
-        : 'text-gray-600 hover:text-gray-900'
+      ${
+        variant === "danger"
+          ? "text-gray-600 hover:text-red-600"
+          : variant === "warning"
+            ? "text-gray-600 hover:text-amber-600"
+            : "text-gray-600 hover:text-gray-900"
       }
     `}
   >
@@ -117,8 +148,23 @@ const ActionButton: React.FC<ActionButtonProps> = ({ label, icon, onClick, varia
  *   onMoreInfo={(f) => navigate(`/flights/${f.codigo}`)}
  * />
  */
-const FlightCard: React.FC<FlightCardProps> = ({ flight, onEdit, onDelete, onMoreInfo }) => {
+const FlightCard: React.FC<FlightCardProps> = ({
+  flight,
+  onEdit,
+  onDelete,
+  onCancel,
+  onMoreInfo,
+}) => {
   const international = isInternational(flight.destino);
+
+  const handleCancel = async () => {
+    if (!onCancel) return;
+    const confirmed = window.confirm(
+      "Esta acción cancelará el vuelo y eliminará también todos sus nodos descendientes. ¿Deseas continuar?",
+    );
+    if (!confirmed) return;
+    await onCancel(flight.codigo);
+  };
 
   return (
     <article
@@ -137,29 +183,39 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onEdit, onDelete, onMor
       <div className="flex items-center gap-4 min-w-0">
         {/* Flight type icon */}
         <div className="flex-shrink-0 text-gray-800" aria-hidden="true">
-          {international ? <Globe size={28} /> : <Plane size={28} className="-rotate-45" />}
+          {international ? (
+            <Globe size={28} />
+          ) : (
+            <Plane size={28} className="-rotate-45" />
+          )}
         </div>
 
         {/* Route label */}
         <div className="min-w-0">
           <p className="text-gray-900 font-semibold text-base truncate">
             {flight.origen}
-            <span className="mx-2 text-gray-500" aria-hidden="true">→</span>
+            <span className="mx-2 text-gray-500" aria-hidden="true">
+              →
+            </span>
             {flight.destino}
           </p>
 
           {/* Status badges — only rendered when relevant */}
           <div className="flex items-center gap-1.5 mt-0.5">
             {flight.promocion && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold
-                               bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-bold
+                               bg-amber-100 text-amber-700 rounded px-1.5 py-0.5"
+              >
                 <Tag size={10} aria-hidden="true" />
                 PROMO
               </span>
             )}
             {flight.alerta && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold
-                               bg-red-100 text-red-700 rounded px-1.5 py-0.5">
+              <span
+                className="inline-flex items-center gap-1 text-[10px] font-bold
+                               bg-red-100 text-red-700 rounded px-1.5 py-0.5"
+              >
                 <AlertTriangle size={10} aria-hidden="true" />
                 ALERTA
               </span>
@@ -177,7 +233,7 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onEdit, onDelete, onMor
       </div>
 
       {/* ── Right: action buttons (rendered only when callbacks are provided) ── */}
-      {(onEdit || onDelete || onMoreInfo) && (
+      {(onEdit || onDelete || onCancel || onMoreInfo) && (
         <div
           className="flex items-center gap-3 flex-shrink-0"
           role="group"
@@ -196,6 +252,14 @@ const FlightCard: React.FC<FlightCardProps> = ({ flight, onEdit, onDelete, onMor
               icon={<Trash2 size={16} />}
               onClick={() => onDelete(flight.codigo)}
               variant="danger"
+            />
+          )}
+          {onCancel && (
+            <ActionButton
+              label="Cancelar subárbol"
+              icon={<AlertTriangle size={16} />}
+              onClick={handleCancel}
+              variant="warning"
             />
           )}
           {onMoreInfo && (
