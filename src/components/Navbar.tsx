@@ -19,7 +19,7 @@ import {
   LayoutList, Network,
   FileJson, BarChart2, GitBranch, List,
 } from 'lucide-react';
-import skybalanceLogo from '../assets/logo-skybalance.png';
+import skybalanceLogo from '../assets/skybalance.png';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
