@@ -60,16 +60,13 @@ const extractErrorMessage = (err: unknown, fallback: string): string => {
  * The backend calculates these from the AVL tree — sending them causes confusion.
  */
 const toPayload = (flight: FlightData): FlightPayload => {
-  const {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    altura,
-    factorEquilibrio,
-    profundidad,
-    nodoCritico,
-    rentabilidad,
-    ...payload
-  } = flight;
-  return payload;
+  const payload = { ...flight } as Partial<FlightData>;
+  delete payload.altura;
+  delete payload.factorEquilibrio;
+  delete payload.profundidad;
+  delete payload.nodoCritico;
+  delete payload.rentabilidad;
+  return payload as FlightPayload;
 };
 
 // ─── Return Interface ─────────────────────────────────────────────────────────
