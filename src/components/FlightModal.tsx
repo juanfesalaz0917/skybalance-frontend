@@ -19,9 +19,9 @@
  *  - The modal disables all inputs while saving, not just the button.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { X, Save, Loader2 } from 'lucide-react';
-import type { FlightData } from '../models/FlightNode';
+import { Loader2, Save, X } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import type { FlightData } from "../models/FlightNode";
 
 // ─── Props Interface ──────────────────────────────────────────────────────────
 
@@ -45,8 +45,9 @@ export interface FlightModalProps {
 interface FormField {
   key: keyof FlightData;
   label: string;
-  type: 'text' | 'number' | 'time' | 'checkbox';
+  type: "text" | "number" | "time" | "checkbox";
   required?: boolean;
+  readOnly?: boolean;
   /** Shown inside the input as a hint */
   placeholder?: string;
 }
@@ -58,104 +59,112 @@ interface FormField {
  */
 const FORM_FIELDS: FormField[] = [
   {
-    key: 'codigo',
-    label: 'Código de vuelo',
-    type: 'text',
+    key: "codigo",
+    label: "Código de vuelo",
+    type: "text",
     required: true,
-    placeholder: 'Ej: SKB-001',
+    placeholder: "Ej: SKB-001",
   },
   {
-    key: 'origen',
-    label: 'Ciudad de origen',
-    type: 'text',
+    key: "origen",
+    label: "Ciudad de origen",
+    type: "text",
     required: true,
-    placeholder: 'Ej: Bogotá',
+    placeholder: "Ej: Bogotá",
   },
   {
-    key: 'destino',
-    label: 'Ciudad de destino',
-    type: 'text',
+    key: "destino",
+    label: "Ciudad de destino",
+    type: "text",
     required: true,
-    placeholder: 'Ej: Cartagena',
+    placeholder: "Ej: Cartagena",
   },
   {
-    key: 'horaSalida',
-    label: 'Hora de salida',
-    type: 'time',
+    key: "horaSalida",
+    label: "Hora de salida",
+    type: "time",
     required: true,
   },
   {
-    key: 'precioBase',
-    label: 'Precio base ($)',
-    type: 'number',
+    key: "precioBase",
+    label: "Precio base ($)",
+    type: "number",
     required: true,
-    placeholder: '0',
+    placeholder: "0",
   },
   {
-    key: 'precioFinal',
-    label: 'Precio final ($)',
-    type: 'number',
-    required: true,
-    placeholder: '0',
+    key: "precioFinal",
+    label: "Precio final ($)",
+    type: "number",
+    readOnly: true,
+    placeholder: "0",
   },
   {
-    key: 'pasajeros',
-    label: 'Número de pasajeros',
-    type: 'number',
+    key: "pasajeros",
+    label: "Número de pasajeros",
+    type: "number",
     required: true,
-    placeholder: '0',
+    placeholder: "0",
   },
   {
-    key: 'prioridad',
-    label: 'Prioridad (1 = alta)',
-    type: 'number',
+    key: "prioridad",
+    label: "Prioridad (1 = alta)",
+    type: "number",
     required: true,
-    placeholder: '1',
+    placeholder: "1",
   },
-  { key: 'promocion', label: 'Vuelo en promoción', type: 'checkbox' },
-  { key: 'alerta',    label: 'Activar alerta',     type: 'checkbox' },
+  { key: "promocion", label: "Vuelo en promoción", type: "checkbox" },
+  { key: "alerta", label: "Activar alerta", type: "checkbox" },
 ];
 
 // ─── Empty form factory ───────────────────────────────────────────────────────
 
 const emptyForm = (): FlightData => ({
-  codigo:           '',
-  origen:           '',
-  destino:          '',
-  horaSalida:       '',
-  precioBase:       0,
-  precioFinal:      0,
-  pasajeros:        0,
-  prioridad:        1,
-  promocion:        false,
-  alerta:           false,
+  codigo: "",
+  origen: "",
+  destino: "",
+  horaSalida: "",
+  precioBase: 0,
+  precioFinal: 0,
+  pasajeros: 0,
+  prioridad: 1,
+  promocion: false,
+  alerta: false,
   // Computed by backend — zeroed here, overwritten on fetch
-  altura:           0,
+  altura: 0,
   factorEquilibrio: 0,
-  profundidad:      0,
-  nodoCritico:      false,
-  rentabilidad:     0,
+  profundidad: 0,
+  nodoCritico: false,
+  rentabilidad: 0,
 });
 
 // ─── Validation (pure function — unit-testable in isolation) ──────────────────
 
-const validate = (data: FlightData): Partial<Record<keyof FlightData, string>> => {
+const validate = (
+  data: FlightData,
+): Partial<Record<keyof FlightData, string>> => {
   const errors: Partial<Record<keyof FlightData, string>> = {};
 
   FORM_FIELDS.forEach(({ key, required }) => {
     if (!required) return;
     const val = data[key];
     const empty =
-      val === '' || val === null || val === undefined ||
-      (typeof val === 'number' && (isNaN(val) || val === 0));
-    if (empty) errors[key] = 'Este campo es obligatorio.';
+      val === "" ||
+      val === null ||
+      val === undefined ||
+      (typeof val === "number" && (isNaN(val) || val === 0));
+    if (empty) errors[key] = "Este campo es obligatorio.";
   });
 
-  if (data.precioBase > 0 && data.precioFinal > 0 && data.precioFinal < data.precioBase) {
-    errors.precioFinal = 'El precio final no puede ser menor al precio base.';
+  if (
+    data.precioBase > 0 &&
+    data.precioFinal > 0 &&
+    data.precioFinal < data.precioBase
+  ) {
+    errors.precioFinal = "El precio final no puede ser menor al precio base.";
   }
   if (data.pasajeros < 0) {
-    errors.pasajeros = 'No puede ser negativo.';
+    errors.pasajeros = "No puede ser negativo.";
   }
 
   return errors;
@@ -169,14 +178,16 @@ const FlightModal: React.FC<FlightModalProps> = ({
   onSave,
   onClose,
 }) => {
-  const [formData, setFormData]   = useState<FlightData>(emptyForm);
-  const [errors, setErrors]       = useState<Partial<Record<keyof FlightData, string>>>({});
+  const [formData, setFormData] = useState<FlightData>(emptyForm);
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof FlightData, string>>
+  >({});
   const [submitted, setSubmitted] = useState(false);
   /**
    * isSaving — true while the async onSave promise is pending.
    * Disables all inputs and shows a spinner on "Guardar" to prevent double-submits.
    */
-  const [isSaving, setIsSaving]   = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // ── Reset form when modal opens ──
   useEffect(() => {
@@ -191,15 +202,15 @@ const FlightModal: React.FC<FlightModalProps> = ({
   // ── Close on Escape (disabled while saving) ──
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isSaving) onClose();
+      if (e.key === "Escape" && !isSaving) onClose();
     },
     [onClose, isSaving],
   );
 
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, handleKeyDown]);
 
   if (!isOpen) return null;
@@ -207,13 +218,13 @@ const FlightModal: React.FC<FlightModalProps> = ({
   // ── Field change ──
 
   const handleChange = (key: keyof FlightData, rawValue: string | boolean) => {
-    setFormData(prev => {
-      const field = FORM_FIELDS.find(f => f.key === key);
+    setFormData((prev) => {
+      const field = FORM_FIELDS.find((f) => f.key === key);
       let value: FlightData[typeof key];
 
-      if (field?.type === 'checkbox') {
+      if (field?.type === "checkbox") {
         value = rawValue as boolean;
-      } else if (field?.type === 'number') {
+      } else if (field?.type === "number") {
         // parseFloat so "1.5" works; fall back to 0 only for truly empty input
         const parsed = parseFloat(rawValue as string);
         value = isNaN(parsed) ? 0 : parsed;
@@ -254,16 +265,19 @@ const FlightModal: React.FC<FlightModalProps> = ({
     }
   };
 
-  const isEditMode = !!initialFlight?.codigo && initialFlight.codigo.trim() !== '';
+  const isEditMode =
+    !!initialFlight?.codigo && initialFlight.codigo.trim() !== "";
   const title = isEditMode
     ? `Editar vuelo — ${initialFlight?.codigo}`
-    : 'Crear nuevo vuelo';
+    : "Crear nuevo vuelo";
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-      onClick={e => { if (e.target === e.currentTarget && !isSaving) onClose(); }}
+      style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !isSaving) onClose();
+      }}
       role="presentation"
     >
       <div
@@ -277,7 +291,10 @@ const FlightModal: React.FC<FlightModalProps> = ({
       >
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-black">
-          <h2 id="modal-title" className="text-white font-bold text-lg tracking-wide">
+          <h2
+            id="modal-title"
+            className="text-white font-bold text-lg tracking-wide"
+          >
             {title}
           </h2>
           <button
@@ -297,21 +314,26 @@ const FlightModal: React.FC<FlightModalProps> = ({
           noValidate
           className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4"
         >
-          {FORM_FIELDS.map(({ key, label, type, placeholder }) => {
+          {FORM_FIELDS.map(({ key, label, type, placeholder, readOnly }) => {
             const fieldError = errors[key];
             const value = formData[key];
 
-            if (type === 'checkbox') {
+            if (type === "checkbox") {
               return (
-                <label key={key} className="flex items-center gap-3 cursor-pointer select-none">
+                <label
+                  key={key}
+                  className="flex items-center gap-3 cursor-pointer select-none"
+                >
                   <input
                     type="checkbox"
                     checked={value as boolean}
                     disabled={isSaving}
-                    onChange={e => handleChange(key, e.target.checked)}
+                    onChange={(e) => handleChange(key, e.target.checked)}
                     className="w-4 h-4 accent-black rounded disabled:opacity-50"
                   />
-                  <span className="text-sm font-medium text-gray-700">{label}</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    {label}
+                  </span>
                 </label>
               );
             }
@@ -330,22 +352,35 @@ const FlightModal: React.FC<FlightModalProps> = ({
                   value={value as string | number}
                   placeholder={placeholder}
                   disabled={isSaving}
-                  onChange={e => handleChange(key, e.target.value)}
+                  readOnly={readOnly}
+                  onChange={(e) => handleChange(key, e.target.value)}
                   className={`
                     w-full rounded-lg border px-3 py-2 text-sm text-gray-900
                     outline-none transition-colors duration-150
                     focus:ring-2 focus:ring-black/20
                     disabled:opacity-50 disabled:cursor-not-allowed
-                    ${fieldError
-                      ? 'border-red-400 bg-red-50'
-                      : 'border-gray-300 bg-white hover:border-gray-400'
+                    ${
+                      readOnly
+                        ? "border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed"
+                        : fieldError
+                          ? "border-red-400 bg-red-50"
+                          : "border-gray-300 bg-white hover:border-gray-400"
                     }
                   `}
                   aria-invalid={!!fieldError}
                   aria-describedby={fieldError ? `${key}-error` : undefined}
                 />
+                {readOnly && (
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Calculado automáticamente por el sistema.
+                  </p>
+                )}
                 {fieldError && (
-                  <p id={`${key}-error`} role="alert" className="text-xs text-red-500 mt-0.5">
+                  <p
+                    id={`${key}-error`}
+                    role="alert"
+                    className="text-xs text-red-500 mt-0.5"
+                  >
                     {fieldError}
                   </p>
                 )}
@@ -382,7 +417,11 @@ const FlightModal: React.FC<FlightModalProps> = ({
             >
               {isSaving ? (
                 <>
-                  <Loader2 size={15} className="animate-spin" aria-hidden="true" />
+                  <Loader2
+                    size={15}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
                   Guardando…
                 </>
               ) : (
