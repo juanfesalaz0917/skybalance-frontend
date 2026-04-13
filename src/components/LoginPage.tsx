@@ -17,7 +17,7 @@ import { User, Lock, ArrowRight, Loader2 } from 'lucide-react';
  * Static logo asset — Vite resolves this import at build time.
  * To swap the logo: change only this import path.
  */
-import skybalanceLogo from '../assets/logo-skybalance.png';
+import skybalanceLogo from '../assets/skybalance.png';
 // ─── Props Interface ──────────────────────────────────────────────────────────
 
 /**
