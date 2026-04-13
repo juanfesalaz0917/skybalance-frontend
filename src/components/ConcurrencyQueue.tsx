@@ -340,21 +340,32 @@ const ConcurrencyQueue: React.FC<ConcurrencyQueueProps> = ({
               )}
               {(["precioBase", "precioFinal", "pasajeros"] as const).map(
                 (field) => (
-                  <input
-                    key={field}
-                    type="number"
-                    placeholder={field}
-                    value={(draft[field] as number) || ""}
-                    onChange={(e) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        [field]: Number(e.target.value),
-                      }))
-                    }
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5
-                           text-xs text-white placeholder-zinc-500 outline-none
-                           focus:border-zinc-500"
-                  />
+                  <div key={field} className="space-y-1">
+                    <input
+                      type="number"
+                      placeholder={field}
+                      value={(draft[field] as number) || ""}
+                      onChange={(e) => {
+                        if (field === "precioFinal") return;
+                        setDraft((prev) => ({
+                          ...prev,
+                          [field]: Number(e.target.value),
+                        }));
+                      }}
+                      readOnly={field === "precioFinal"}
+                      className={`w-full border rounded-lg px-2.5 py-1.5 text-xs outline-none
+                           ${
+                             field === "precioFinal"
+                               ? "bg-zinc-800 border-zinc-700 text-zinc-400 cursor-not-allowed"
+                               : "bg-zinc-800 border-zinc-700 text-white placeholder-zinc-500 focus:border-zinc-500"
+                           }`}
+                    />
+                    {field === "precioFinal" && (
+                      <p className="text-[10px] text-zinc-500">
+                        Calculado automáticamente por el sistema.
+                      </p>
+                    )}
+                  </div>
                 ),
               )}
               {error && <p className="text-red-400 text-[10px]">{error}</p>}
